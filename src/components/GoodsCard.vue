@@ -9,7 +9,8 @@
       class="goods-img"
     />
     <div class="goods-info">
-      <h3 class="goods-title">{{ title }}</h3>
+      <h3 class="goods-title" v-if="titleHtml" v-html="titleHtml"></h3>
+      <h3 class="goods-title" v-else>{{ title }}</h3>
       <div class="goods-footer">
         <span class="goods-price">&yen;{{ price }}</span>
         <span class="goods-sales" v-if="sales">月销 {{ sales }}</span>
@@ -25,6 +26,7 @@ import { useRouter } from 'vue-router'
 const props = defineProps({
   id: { type: [Number, String], required: true },
   title: { type: String, default: '' },
+  titleHtml: { type: String, default: '' },
   price: { type: [Number, String], default: 0 },
   sales: { type: [Number, String], default: 0 },
   image: { type: String, default: 'https://img.yzcdn.cn/vant/cat.jpeg' },

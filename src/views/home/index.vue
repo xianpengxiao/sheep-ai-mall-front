@@ -20,11 +20,43 @@
     </div>
 
     <!-- 2. 搜索栏 -->
-    <div class="search-wrap">
-      <div class="search-bar" @click="goSearch">
+    <div ref="searchWrapRef" class="search-wrap" :class="{ active: showSearch }">
+      <!-- 搜索条 -->
+      <div class="search-bar" v-if="!showSearch" @click="openSearch">
         <van-icon name="search" size="17" color="#9a9aae" />
         <span>搜索商品、品牌...</span>
       </div>
+
+      <!-- 激活态：输入框 + 下拉面板 -->
+      <template v-else>
+        <form class="search-bar active" @submit.prevent="onSearchSubmit">
+          <van-icon name="search" size="17" color="#9a9aae" />
+          <input
+            ref="searchInputRef"
+            v-model="searchKeyword"
+            class="search-input-field"
+            placeholder="搜索商品、品牌..."
+            autofocus
+          />
+          <van-icon name="search" size="17" color="#fff" class="search-btn-icon" @click="onSearchSubmit" />
+        </form>
+
+        <!-- 搜索历史下拉 -->
+        <div v-if="historyList.length > 0" class="search-dropdown">
+          <div class="history-head">
+            <span>搜索历史</span>
+            <span class="history-clear" @click="clearSearchHistory">清除</span>
+          </div>
+          <div class="history-tags">
+            <span
+              v-for="(item, i) in historyList"
+              :key="i"
+              class="history-tag"
+              @click="searchKeyword = item; onSearchSubmit()"
+            >{{ item }}</span>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- 3. Banner -->
@@ -111,7 +143,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getTree } from '../../api/category.js'
 import { getSpuPage } from '../../api/goods.js'
@@ -119,8 +151,50 @@ import GoodsCard from '../../components/GoodsCard.vue'
 
 const router = useRouter()
 
-function goSearch() {
-  router.push('/search')
+// ── 搜索遮罩 ──
+const showSearch = ref(false)
+const searchKeyword = ref('')
+const searchWrapRef = ref(null)
+
+const HISTORY_KEY = 'search_history'
+const historyList = ref(loadSearchHistory())
+
+function loadSearchHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [] } catch { return [] }
+}
+
+function clearSearchHistory() {
+  historyList.value = []
+  localStorage.removeItem(HISTORY_KEY)
+}
+
+function openSearch() {
+  showSearch.value = true
+  // 实时同步 localStorage 历史
+  historyList.value = loadSearchHistory()
+  setTimeout(() => {
+    searchInputRef.value?.focus()
+  }, 50)
+}
+
+/** 点击搜索区域外部 → 关闭 */
+function onClickOutside(e) {
+  if (showSearch.value && searchWrapRef.value && !searchWrapRef.value.contains(e.target)) {
+    showSearch.value = false
+    searchKeyword.value = ''
+  }
+}
+
+/** 提交搜索 → 保存历史 → 跳转搜索页 */
+function onSearchSubmit() {
+  const kw = searchKeyword.value.trim()
+  if (!kw) return
+  const list = loadSearchHistory().filter(h => h !== kw)
+  list.unshift(kw)
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 5)))
+  showSearch.value = false
+  searchKeyword.value = ''
+  router.push({ name: 'Search', query: { keyword: kw } })
 }
 
 const cartCount = ref(0)
@@ -196,6 +270,12 @@ onMounted(async () => {
   } catch {
     // 静默处理
   }
+})
+
+// 全局点击 → 关闭搜索下拉
+document.addEventListener('mousedown', onClickOutside)
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onClickOutside)
 })
 
 function onSubCategoryClick(sub) {
@@ -357,6 +437,87 @@ async function onLoad() {
   color: #9a9aae;
   font-size: 14px;
   flex: 1;
+}
+
+/* 搜索激活态输入框 */
+.search-bar.active {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: #f5f3f0;
+  border-radius: 28px;
+  border: 2px solid var(--accent, #e8573a);
+  box-shadow: 0 2px 12px rgba(232,87,58,0.12);
+}
+.search-input-field {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-h, #1a1a2e);
+  font-family: var(--sans, 'Inter', sans-serif);
+}
+.search-input-field::placeholder {
+  color: #9a9aae;
+}
+.search-cancel {
+  font-size: 14px;
+  color: var(--accent, #e8573a);
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.search-btn-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--gradient-warm, linear-gradient(135deg, #e8573a 0%, #f39c12 100%));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* 搜索历史下拉面板 */
+.search-dropdown {
+  background: #fff;
+  padding: 16px;
+  margin-top: 2px;
+}
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h, #1a1a2e);
+}
+.history-clear {
+  font-size: 12px;
+  color: #9a9aae;
+  cursor: pointer;
+  font-weight: 400;
+}
+.history-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.history-tag {
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  background: #f5f3f0;
+  color: #5a5a6e;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.history-tag:active {
+  background: #e8e4e0;
 }
 
 /* ── Banner ── */
