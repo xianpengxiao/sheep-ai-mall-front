@@ -242,8 +242,15 @@ const skuList = computed(() => {
   return spu.value?.skuList || []
 })
 
+const minSkuPrice = computed(() => {
+  const skus = skuList.value
+  if (!skus || skus.length === 0) return 0
+  return Math.min(...skus.map(s => Number(s.price || 0)))
+})
+
 const displayPrice = computed(() => {
-  return selectedSku.value?.price ?? spu.value?.price ?? 0
+  if (selectedSku.value) return selectedSku.value.price
+  return minSkuPrice.value || spu.value?.price || 0
 })
 
 /** 可选最大数量：根据选中 SKU 的库存，默认 999 */
@@ -376,7 +383,7 @@ async function addToCart() {
   addingCart.value = true
   try {
     await addCart({
-      memberId: userStore.memberInfo?.userId || 0,
+      userId: userStore.memberInfo?.userId || 0,
       spuId: spu.value.id,
       skuId: selectedSku.value?.id || 0,
       quantity: quantity.value,

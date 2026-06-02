@@ -1,6 +1,6 @@
 <template>
   <div class="page-profile">
-    <van-nav-bar title="个人中心" />
+    <NavBar title="个人中心" :show-back="false" />
     <div class="profile-content">
       <div class="avatar-section">
         <van-image round width="80" height="80" :src="memberInfo?.avatar || defaultAvatar" />
@@ -21,6 +21,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user.js'
+import NavBar from '../components/NavBar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()

@@ -1,6 +1,6 @@
 <template>
   <div class="page-login">
-    <van-nav-bar title="登录" />
+    <NavBar title="登录" :show-back="false" />
     <div class="login-hero">
       <div class="login-brand">SheepAI Mall</div>
       <p class="login-desc">欢迎回来，登录您的账号</p>
@@ -35,6 +35,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user.js'
 import { login as loginApi } from '../../api/member.js'
+import NavBar from '../../components/NavBar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()

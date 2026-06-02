@@ -23,7 +23,7 @@ const routes = [
   {
     path: '/cart',
     name: 'Cart',
-    component: () => import('../views/Cart.vue'),
+    component: () => import('../views/cart/Index.vue'),
     meta: { title: '购物车', requiresAuth: true, showTabbar: true },
   },
   {
@@ -49,6 +49,18 @@ const routes = [
     name: 'Search',
     component: () => import('../views/Search.vue'),
     meta: { title: '搜索' },
+  },
+  {
+    path: '/address',
+    name: 'AddressList',
+    component: () => import('../views/address/Index.vue'),
+    meta: { title: '收货地址', requiresAuth: true },
+  },
+  {
+    path: '/address/edit/:id?',
+    name: 'AddressEdit',
+    component: () => import('../views/address/Edit.vue'),
+    meta: { title: '编辑地址', requiresAuth: true },
   },
 ]
 

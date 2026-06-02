@@ -129,7 +129,7 @@
               :key="item.id"
               :id="item.id"
               :title="item.name"
-              :price="item.price"
+              :price="item.minPrice"
               :sales="item.sales"
               :image="item.mainImage"
             />
@@ -146,7 +146,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getTree } from '../../api/category.js'
-import { getSpuPage } from '../../api/goods.js'
+import { getSpuPage, getSkuBySpuId } from '../../api/goods.js'
 import GoodsCard from '../../components/GoodsCard.vue'
 
 const router = useRouter()
@@ -305,6 +305,23 @@ async function onLoad() {
     })
     const page = res || {}
     const records = page.records || []
+
+    // 批量获取每个 SPU 下 SKU 的最低价格
+    if (records.length > 0) {
+      const results = await Promise.allSettled(
+        records.map(r => getSkuBySpuId(r.id))
+      )
+      records.forEach((record, i) => {
+        const skus = results[i].value
+        if (Array.isArray(skus) && skus.length > 0) {
+          const minPrice = Math.min(...skus.map(s => Number(s.price || 0)))
+          record.minPrice = minPrice.toFixed(2)
+        } else {
+          record.minPrice = '0.00'
+        }
+      })
+    }
+
     goodsList.value.push(...records)
     pageNum.value++
 
