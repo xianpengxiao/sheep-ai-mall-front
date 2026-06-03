@@ -63,7 +63,7 @@
 
 body {
   margin: 0;
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%) !important;
+  background: #fff !important;
 }
 
 @media (prefers-color-scheme: dark) {

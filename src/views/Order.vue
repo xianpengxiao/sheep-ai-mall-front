@@ -299,10 +299,14 @@ async function handleSubmit() {
         quantity: item.quantity,
       })),
     }
-    await createOrder(orderData)
+    const result = await createOrder(orderData)
     closeToast()
-    showToast('下单成功')
-    router.replace('/')
+    // result.id 被 request.js 大整数保护自动转为字符串
+    const orderId = result?.id || ''
+    router.replace({
+      name: 'Payment',
+      query: { orderId, totalAmount: subtotal.value },
+    })
   } catch (e) {
     closeToast()
     console.error('[Order] 提交失败:', e)
@@ -334,7 +338,7 @@ onActivated(() => {
 
 .page-order {
   min-height: 100vh;
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  background: #fff;
   padding-bottom: 80px;
 }
 .nav-bar-sticky {

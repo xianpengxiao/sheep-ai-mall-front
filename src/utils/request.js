@@ -6,6 +6,19 @@ const request = axios.create({
   timeout: 10000,
 })
 
+// ── 大整数保护：在 JSON.parse 前将 16+ 位数字引号化 ──
+// Snowflake ID（19位）超出 JS Number 安全范围，在 JSON 解析前
+// 将 : 后的 16+ 位数字用引号包裹，使其被解析为字符串。
+// 注：必须插在 transformResponse 数组首位，因为默认的 JSON.parse
+// 一旦执行，大数精度即丢失不可逆。
+request.defaults.transformResponse = [
+  (raw) => {
+    if (typeof raw !== 'string') return raw
+    return raw.replace(/:\s*(\d{16,})\s*([,}\]])/g, ': "$1"$2')
+  },
+  ...(Array.isArray(request.defaults.transformResponse) ? request.defaults.transformResponse : []),
+]
+
 // 请求拦截器：附加 token
 request.interceptors.request.use(
   (config) => {
@@ -25,9 +38,15 @@ request.interceptors.response.use(
     if (data.code === 200) {
       return data.data
     }
-    // 业务异常
+    // 业务 code 401 → 按未登录处理（如 token 过期后端返回的 business 401）
+    if (data.code === 401) {
+      localStorage.removeItem('token')
+      try { localStorage.removeItem('user') } catch {}
+      window.dispatchEvent(new CustomEvent('auth:logout'))
+      return Promise.reject(new Error(data.msg || '未登录'))
+    }
+    // 其他业务异常
     const msg = data.msg || '请求失败'
-    // 支持请求级静默：config.silent 为 true 时不弹 toast
     if (!response.config.silent) {
       showToast(msg)
     }
@@ -37,8 +56,11 @@ request.interceptors.response.use(
     const status = error.response?.status
     const msg = error.response?.data?.msg || error.message || '网络错误'
 
-    // 401 未认证 → 静默处理，由调用方决定是否跳转登录
+    // 401 Token 失效 → 清除 localStorage，通知应用退出登录
     if (status === 401) {
+      localStorage.removeItem('token')
+      try { localStorage.removeItem('user') } catch {}
+      window.dispatchEvent(new CustomEvent('auth:logout'))
       return Promise.reject(error)
     }
 

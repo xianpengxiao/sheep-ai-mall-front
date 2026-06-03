@@ -72,7 +72,7 @@ async function onSubmit() {
 <style scoped>
 .page-login {
   min-height: 100vh;
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  background: #fff;
 }
 
 .login-hero {

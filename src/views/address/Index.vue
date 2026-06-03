@@ -67,8 +67,8 @@
 import { ref, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
-import { getAddressList, deleteAddress, setDefaultAddress } from '../api/address.js'
-import NavBar from '../components/NavBar.vue'
+import { getAddressList, deleteAddress, setDefaultAddress } from '../../api/address.js'
+import NavBar from '../../components/NavBar.vue'
 
 const router = useRouter()
 
@@ -123,7 +123,7 @@ onActivated(() => fetchList())
 <style scoped>
 .page-address {
   min-height: 100vh;
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  background: #fff;
   padding-bottom: 80px;
 }
 .state-wrap {

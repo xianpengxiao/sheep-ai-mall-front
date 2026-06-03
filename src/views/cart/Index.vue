@@ -3,8 +3,8 @@
     <!-- ═══════ 导航栏（粘性） ═══════ -->
     <div class="nav-bar-sticky">
       <NavBar title="购物车">
-        <template #right>
-          <span v-if="goodsList.length > 0" class="clear-btn" @click="handleClear">清空</span>
+        <template v-if="goodsList.length > 0" #right>
+          <span class="clear-btn" @click="handleClear">清空</span>
         </template>
       </NavBar>
     </div>
@@ -55,7 +55,6 @@
         <span class="empty-hint">快去挑选心仪的商品吧</span>
         <van-button
           type="primary"
-          size="small"
           round
           color="linear-gradient(135deg, #e8573a 0%, #f39c12 100%)"
           class="empty-btn"
@@ -416,11 +415,32 @@ onActivated(() => fetchCart())
   min-height: 60vh;
   animation: fadeIn 0.35s ease-out;
 }
+.cart-empty {
+  width: 100%;
+}
+.cart-empty :deep(.van-empty__image) {
+  margin-bottom: 8px;
+}
+.cart-empty :deep(.van-empty__description) {
+  font-size: 16px;
+  color: #5a5a6e;
+  margin-bottom: 4px;
+}
+.cart-empty :deep(.van-empty__bottom) {
+  text-align: center;
+}
 .empty-hint {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
+  text-align: center;
   color: #9a9aae;
-  margin-bottom: 16px;
+  margin: 8px 0 24px;
+}
+.empty-btn {
+  width: 200px;
+  height: 44px;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 /* ── 导航栏（粘性） ── */

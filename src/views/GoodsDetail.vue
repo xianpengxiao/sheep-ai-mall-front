@@ -204,7 +204,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { showToast, showConfirmDialog } from 'vant'
 import { getSpuDetail } from '../api/goods.js'
 import { addCart } from '../api/cart.js'
 import { useUserStore } from '../stores/user.js'
@@ -369,8 +369,18 @@ function setActiveImage(index) {
 
 async function addToCart() {
   if (!userStore.isLogin) {
-    showToast('请先登录')
-    router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    try {
+      await showConfirmDialog({
+        title: '提示',
+        message: '请先登录后再加入购物车',
+        confirmButtonText: '去登录',
+        cancelButtonText: '再想想',
+        confirmButtonColor: '#e8573a',
+      })
+      router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    } catch {
+      // 用户取消
+    }
     return
   }
 
@@ -391,7 +401,21 @@ async function addToCart() {
     showToast('已加入购物车')
     quantity.value = 1
   } catch {
-    // toast 已在 request 拦截器中处理
+    // token 过期导致 API 失败后，引导重新登录
+    if (!userStore.isLogin) {
+      try {
+        await showConfirmDialog({
+          title: '提示',
+          message: '登录已过期，请重新登录',
+          confirmButtonText: '去登录',
+          cancelButtonText: '再想想',
+          confirmButtonColor: '#e8573a',
+        })
+        router.push({ name: 'Login', query: { redirect: route.fullPath } })
+      } catch {
+        // 用户取消
+      }
+    }
   } finally {
     addingCart.value = false
   }
@@ -469,7 +493,7 @@ watch(() => route.params.id, () => {
 
 .page-goods-detail {
   min-height: 100vh;
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  background: #fff;
 }
 
 /* ── 顶部导航栏（与首页 top-bar 统一） ── */

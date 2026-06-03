@@ -4,7 +4,7 @@
     :left-arrow="showBack"
     @click-left="handleBack"
   >
-    <template #right>
+    <template v-if="$slots.right" #right>
       <slot name="right" />
     </template>
     <template v-if="$slots.left" #left>

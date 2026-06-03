@@ -23,10 +23,17 @@
 </template>
 
 <script setup>
-  import { computed } from 'vue'
+  import { computed, onMounted, onUnmounted } from 'vue'
   import { useRoute } from 'vue-router'
+  import { useUserStore } from './stores/user.js'
 
   const route = useRoute()
+  const userStore = useUserStore()
+
+  // 监听 401 退出事件（来自 request.js）
+  function onAuthLogout() { userStore.logout() }
+  onMounted(() => window.addEventListener('auth:logout', onAuthLogout))
+  onUnmounted(() => window.removeEventListener('auth:logout', onAuthLogout))
 
   const showTabbar = computed(() => !!route.meta.showTabbar)
 
@@ -42,7 +49,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  background: #fff;
 }
 
 #app {

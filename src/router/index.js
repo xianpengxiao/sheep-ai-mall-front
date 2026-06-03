@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { showConfirmDialog } from 'vant'
 import { useUserStore } from '../stores/user.js'
 
 const routes = [
@@ -31,6 +32,24 @@ const routes = [
     name: 'Order',
     component: () => import('../views/Order.vue'),
     meta: { title: '订单', requiresAuth: true },
+  },
+  {
+    path: '/order/list',
+    name: 'OrderList',
+    component: () => import('../views/order/list.vue'),
+    meta: { title: '我的订单', requiresAuth: true },
+  },
+  {
+    path: '/order/detail/:id',
+    name: 'OrderDetail',
+    component: () => import('../views/order/detail.vue'),
+    meta: { title: '订单详情', requiresAuth: true },
+  },
+  {
+    path: '/payment',
+    name: 'Payment',
+    component: () => import('../views/payment/index.vue'),
+    meta: { title: '支付中心', requiresAuth: true },
   },
   {
     path: '/member/:pathMatch(.*)*',
@@ -67,18 +86,29 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior() {
+    return { top: 0 }
+  },
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
-  // 需要 Pinia 实例，这里通过内部获取
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
 
   if (to.meta.requiresAuth && !userStore.isLogin) {
-    // 未登录访问需授权页面 → 跳转登录
-    next({ name: 'Login', query: { redirect: to.fullPath } })
+    try {
+      await showConfirmDialog({
+        title: '提示',
+        message: '请先登录后再操作',
+        confirmButtonText: '去登录',
+        cancelButtonText: '返回',
+        confirmButtonColor: '#e8573a',
+      })
+      next({ name: 'Login', query: { redirect: to.fullPath } })
+    } catch {
+      next(false)
+    }
   } else if (to.name === 'Login' && userStore.isLogin) {
-    // 已登录访问登录页 → 跳转首页
     next('/')
   } else {
     next()

@@ -338,7 +338,7 @@ async function onLoad() {
 
 <style scoped>
 .page-home {
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  background: #fff;
   min-height: 100vh;
 }
 

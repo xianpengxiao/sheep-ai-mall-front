@@ -328,7 +328,7 @@ async function loadCategoryTree() {
 
 .page-search {
   min-height: 100vh;
-  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  background: #fff;
 }
 
 /* ── 搜索 + 筛选整体 sticky 容器 ── */
