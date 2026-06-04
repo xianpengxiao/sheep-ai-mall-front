@@ -51,7 +51,7 @@
         <div class="status-item" @click="goOrdersByStatus(3)">
           <div class="status-icon-wrap">
             <van-icon name="records-o" size="24" color="#07c160" />
-            <van-badge v-if="orderCounts[4]" :content="orderCounts[4]" max="99" class="status-badge" />
+            <van-badge v-if="orderCounts[3]" :content="orderCounts[3]" max="99" class="status-badge" />
           </div>
           <span class="status-label">已完成</span>
         </div>
@@ -105,7 +105,7 @@ async function fetchOrderCounts() {
     const res = await getOrderList({ pageNum: 1, pageSize: 100 })
     // 兼容分页对象 { records } 和直接返回数组
     const list = Array.isArray(res) ? res : (res?.records || [])
-    const counts = { 0: 0, 1: 0, 2: 0, 4: 0 }
+    const counts = { 0: 0, 1: 0, 2: 0, 3: 0 }
     for (const order of list) {
       const s = order.status
       if (s in counts) counts[s]++

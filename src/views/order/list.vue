@@ -174,25 +174,16 @@ async function fetchOrders() {
   loading.value = true
   try {
     const params = { pageNum: pageNum.value, pageSize: pageSize.value }
-    const res = await getOrderList(params)
-    // 兼容分页对象 { records } 和直接返回数组
-    let records = Array.isArray(res) ? res : (res?.records || [])
-    total.value = Array.isArray(res) ? res.length : (res?.total || 0)
-
-    // 前端按状态筛选（兼容后端不支持 status 参数的情况）
     const statusFilter = getStatusFilter()
     if (statusFilter !== undefined) {
-      records = records.filter(o => o.status === statusFilter)
+      params.status = statusFilter
     }
-
+    const res = await getOrderList(params)
+    const records = res?.records || []
+    total.value = res?.total ?? 0
     list.value = records
 
-    // debug: 查看首条订单的字段和 items 结构
-    if (records.length > 0) {
-      console.log('[OrderList] 首条订单字段:', Object.keys(records[0]))
-      console.log('[OrderList] 首条订单 items:', records[0].items)
-      console.log('[OrderList] orderItems(records[0]):', orderItems(records[0]))
-    }
+    console.log('[OrderList] status:', params.status, 'records:', records.length, 'total:', total.value)
   } catch (e) {
     console.error('[OrderList] 加载失败:', e)
     showToast('加载订单失败')
@@ -202,7 +193,8 @@ async function fetchOrders() {
 }
 
 // ── Tab切换 ──
-function onTabChange() {
+function onTabChange(name) {
+  activeTab.value = name
   pageNum.value = 1
   fetchOrders()
 }

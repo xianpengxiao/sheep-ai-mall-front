@@ -1,6 +1,10 @@
 <template>
   <div class="page-login">
-    <NavBar title="登录" :show-back="false" />
+    <NavBar title="登录">
+      <template #left>
+        <van-icon name="arrow-left" class="back-icon" @click="router.replace('/')" />
+      </template>
+    </NavBar>
     <div class="login-hero">
       <div class="login-brand">SheepAI Mall</div>
       <p class="login-desc">欢迎回来，登录您的账号</p>
@@ -74,10 +78,15 @@ async function onSubmit() {
   min-height: 100vh;
   background: #fff;
 }
-
 .login-hero {
   text-align: center;
   padding: 32px 16px 24px;
+}
+
+.back-icon {
+  font-size: 20px;
+  color: #1a1a2e;
+  padding: 4px;
 }
 
 .login-brand {

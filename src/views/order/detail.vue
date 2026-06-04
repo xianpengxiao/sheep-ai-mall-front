@@ -132,7 +132,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import { getOrderDetail } from '../../api/order.js'
@@ -220,7 +220,10 @@ function goPay() {
   })
 }
 
-onMounted(() => {
+// 路由参数变化时重新加载（keep-alive 缓存下 onMounted 只执行一次）
+watch(() => route.params.id, fetchDetail, { immediate: true })
+// keep-alive 重新激活时刷新
+onActivated(() => {
   fetchDetail()
 })
 </script>
