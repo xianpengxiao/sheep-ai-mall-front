@@ -30,6 +30,10 @@
           登录
         </van-button>
       </div>
+      <div class="form-footer">
+        没有账号？
+        <router-link to="/register" class="link-register">去注册</router-link>
+      </div>
     </van-form>
   </div>
 </template>
@@ -77,6 +81,17 @@ async function onSubmit() {
 .page-login {
   min-height: 100vh;
   background: #fff;
+}
+.form-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: #9a9aae;
+}
+.link-register {
+  color: #e8573a;
+  text-decoration: none;
+  font-weight: 500;
 }
 .login-hero {
   text-align: center;

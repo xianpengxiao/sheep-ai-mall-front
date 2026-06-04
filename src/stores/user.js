@@ -22,6 +22,9 @@ export const useUserStore = defineStore('user', {
       this.memberInfo = null
       localStorage.removeItem('token')
     },
+    setMemberInfo(info) {
+      this.memberInfo = info
+    },
   },
 
   // pinia-plugin-persistedstate: 自动同步到 localStorage
