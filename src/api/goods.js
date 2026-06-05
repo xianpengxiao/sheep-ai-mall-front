@@ -24,3 +24,18 @@ export function getSpuDetail(id) {
 export function getSkuBySpuId(spuId) {
   return request.get(`/sku/spu/${spuId}`)
 }
+
+/** 新增 SPU（含 SKU 列表） */
+export function addSpu(data) {
+  return request.post('/spu', data)
+}
+
+/** 编辑 SPU */
+export function updateSpu(id, data) {
+  return request.put(`/spu/${id}`, data)
+}
+
+/** 上架/下架 SPU（1=上架 0=下架） */
+export function toggleSpuStatus(id, status) {
+  return request.put(`/spu/${id}/status/${status}`)
+}

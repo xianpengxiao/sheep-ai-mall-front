@@ -7,8 +7,39 @@
         <span class="pc-nav-item active">首页</span>
         <span class="pc-nav-item" @click="$router.push('/cart')">购物车</span>
         <span class="pc-nav-item" @click="$router.push('/profile')">个人中心</span>
+        <!-- 商家中心下拉 -->
+        <div class="merchant-dropdown" @mouseenter="openMerchantDropdown" @mouseleave="merchantOpen = false">
+          <span class="pc-nav-item merchant-trigger" :class="{ active: merchantOpen }">
+            商家中心 <van-icon name="arrow-down" size="12" :class="{ rotated: merchantOpen }" />
+          </span>
+          <transition name="drop-fade">
+            <div v-if="merchantOpen" class="dropdown-panel">
+              <div class="dropdown-item" @click="goMerchant('apply')">
+                <span class="drop-icon">🏪</span>
+                <div class="drop-text">
+                  <div class="drop-title">{{ applyBtnText }}</div>
+                  <div class="drop-desc">{{ applyBtnDesc }}</div>
+                </div>
+              </div>
+              <div
+                class="dropdown-item"
+                :class="{ disabled: !merchantVerified }"
+                @click="goMerchant('dashboard')"
+              >
+                <span class="drop-icon">📊</span>
+                <div class="drop-text">
+                  <div class="drop-title">我的店铺</div>
+                  <div class="drop-desc">{{ merchantVerified ? '管理店铺商品/订单' : '请先完成商家入驻' }}</div>
+                </div>
+              </div>
+            </div>
+          </transition>
+        </div>
       </nav>
       <div class="top-actions">
+        <div class="icon-btn" @click="goMerchantMobile">
+          <van-icon name="shop-o" size="20" />
+        </div>
         <div class="icon-btn" @click="$router.push('/cart')">
           <van-icon name="shopping-cart-o" size="20" />
           <span class="badge" v-if="cartCount > 0">{{ cartCount > 99 ? '99+' : cartCount }}</span>
@@ -145,11 +176,67 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { showToast, showConfirmDialog } from 'vant'
+import { useUserStore } from '../../stores/user.js'
+import { getShopInfo } from '../../api/merchant.js'
 import { getTree } from '../../api/category.js'
 import { getSpuPage, getSkuBySpuId } from '../../api/goods.js'
 import GoodsCard from '../../components/GoodsCard.vue'
 
 const router = useRouter()
+const userStore = useUserStore()
+
+const isLoggedIn = computed(() => userStore.isLogin)
+const merchantOpen = ref(false)
+// 是否已验证为商家（通过 /api/merchant/info 确认）
+const merchantVerified = ref(null) // null=未查 false=不是 true=是
+
+// 开店入驻按钮文案
+const applyBtnText = computed(() => {
+  if (merchantVerified.value) return '已入驻'
+  return '开店入驻'
+})
+const applyBtnDesc = computed(() => {
+  if (merchantVerified.value) return '您已成功入驻'
+  return '成为 SheepAI 商家'
+})
+
+async function openMerchantDropdown() {
+  merchantOpen.value = true
+  if (!isLoggedIn.value || merchantVerified.value !== null) return
+  try {
+    await getShopInfo()
+    merchantVerified.value = true
+  } catch {
+    merchantVerified.value = false
+  }
+}
+
+function goMerchant(target) {
+  if (!isLoggedIn.value) {
+    showConfirmDialog({ title: '提示', message: '请先登录后再操作', confirmButtonText: '去登录', cancelButtonText: '返回' })
+      .then(() => router.push({ name: 'Login', query: { redirect: '/merchant/apply' } }))
+      .catch(() => {})
+    return
+  }
+  if (target === 'apply') {
+    router.push(merchantVerified.value ? '/merchant/dashboard' : '/merchant/apply')
+  } else if (target === 'dashboard') {
+    if (!merchantVerified.value) return showToast('请先完成商家入驻')
+    router.push('/merchant/dashboard')
+  }
+  merchantOpen.value = false
+}
+
+function goMerchantMobile() {
+  if (!isLoggedIn.value) {
+    showConfirmDialog({ title: '提示', message: '请先登录后再操作', confirmButtonText: '去登录', cancelButtonText: '返回' })
+      .then(() => router.push({ name: 'Login', query: { redirect: '/merchant/apply' } }))
+      .catch(() => {})
+    return
+  }
+  router.push(merchantVerified.value ? '/merchant/dashboard' : '/merchant/apply')
+}
 
 // ── 搜索遮罩 ──
 const showSearch = ref(false)
@@ -385,6 +472,75 @@ async function onLoad() {
 }
 .pc-nav-item.active {
   border-bottom-color: #e8573a;
+}
+
+/* ── 商家中心下拉 ── */
+.merchant-dropdown {
+  position: relative;
+}
+.merchant-trigger {
+  display: flex !important;
+  align-items: center;
+  gap: 2px;
+}
+.merchant-trigger .van-icon {
+  transition: transform 0.2s;
+}
+.merchant-trigger .van-icon.rotated {
+  transform: rotate(180deg);
+}
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+  padding: 8px;
+  z-index: 200;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.dropdown-item:hover:not(.disabled) {
+  background: #faf8f6;
+}
+.dropdown-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.drop-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.drop-text {
+  flex: 1;
+}
+.drop-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.drop-desc {
+  font-size: 12px;
+  color: #9a9aae;
+  margin-top: 2px;
+}
+.drop-fade-enter-active,
+.drop-fade-leave-active {
+  transition: all 0.2s ease;
+}
+.drop-fade-enter-from,
+.drop-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 /* 移动端图标按钮 */
@@ -729,6 +885,7 @@ async function onLoad() {
   }
   .pc-nav {
     display: flex;
+    align-items: center;
   }
   .top-actions {
     display: none;

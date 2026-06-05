@@ -7,7 +7,7 @@ const routes = [
     path: '/',
     name: 'Home',
     component: () => import('../views/home/index.vue'),
-    meta: { title: '首页', showTabbar: true },
+    meta: { title: '首页' },
   },
   {
     path: '/login',
@@ -25,13 +25,13 @@ const routes = [
     path: '/profile',
     name: 'Profile',
     component: () => import('../views/Profile.vue'),
-    meta: { title: '个人中心', requiresAuth: true, showTabbar: true },
+    meta: { title: '个人中心', requiresAuth: true },
   },
   {
     path: '/cart',
     name: 'Cart',
     component: () => import('../views/cart/Index.vue'),
-    meta: { title: '购物车', requiresAuth: true, showTabbar: true },
+    meta: { title: '购物车', requiresAuth: true },
   },
   {
     path: '/order',
@@ -86,6 +86,25 @@ const routes = [
     name: 'AddressEdit',
     component: () => import('../views/address/Edit.vue'),
     meta: { title: '编辑地址', requiresAuth: true },
+  },
+  // ── 商家中心 ──
+  {
+    path: '/merchant/apply',
+    name: 'MerchantApply',
+    component: () => import('../views/merchant/Apply.vue'),
+    meta: { title: '商家入驻', requiresAuth: true },
+  },
+  {
+    path: '/merchant/dashboard',
+    name: 'MerchantDashboard',
+    component: () => import('../views/merchant/Dashboard.vue'),
+    meta: { title: '我的店铺', requiresAuth: true },
+  },
+  {
+    path: '/merchant/goods/publish',
+    name: 'MerchantGoodsPublish',
+    component: () => import('../views/merchant/PublishGoods.vue'),
+    meta: { title: '发布商品', requiresAuth: true },
   },
 ]
 

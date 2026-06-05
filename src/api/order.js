@@ -31,3 +31,10 @@ export function cancelOrder(id) {
 export function getOrderList(params) {
   return request.get('/order/page', { params })
 }
+
+/** 订单发货 */
+export function deliverOrder(id, deliveryCompany, deliveryNo) {
+  return request.put(`/merchant/order/${id}/deliver`, null, {
+    params: { deliveryCompany, deliveryNo },
+  })
+}
