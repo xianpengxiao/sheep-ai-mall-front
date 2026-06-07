@@ -34,168 +34,232 @@
         </div>
       </div>
 
-      <!-- ═══════ 主体：左图右信息 ═══════ -->
-      <div class="detail-main">
-        <!-- 左侧：商品图片 -->
-        <div class="detail-gallery">
-          <!-- 主图大图 -->
-          <div class="gallery-main">
-            <van-image :src="activeImage" fit="cover" class="gallery-main-img" />
-          </div>
-          <!-- 缩略图列表 -->
-          <div class="gallery-thumbs" v-if="spuImages.length > 0">
-            <div
-              v-for="(img, i) in spuImages"
-              :key="i"
-              class="gallery-thumb"
-              :class="{ active: i === activeIndex }"
-              @click="setActiveImage(i)"
-            >
-              <van-image :src="img" fit="cover" class="gallery-thumb-img" />
-            </div>
-          </div>
-        </div>
-
-        <!-- 右侧：商品信息 + 规格 + 数量 + 操作 -->
-        <div class="detail-info">
-          <h1 class="goods-name">{{ spu.name }}</h1>
-          <p class="goods-subtitle" v-if="spu.subTitle">{{ spu.subTitle }}</p>
-
-          <div class="info-row">
-            <span class="goods-price">&yen;{{ displayPrice }}</span>
-            <span class="goods-sales" v-if="spu.sales > 0">已售 {{ spu.sales }}</span>
-            <span class="goods-sales" v-else>暂无销量</span>
-          </div>
-
-          <!-- ═══════ 规格选择 ═══════ -->
-          <div v-if="skuList.length > 0" class="specs-block">
-            <div class="specs-title">规格</div>
-            <div class="specs-list">
-              <div
-                v-for="sku in skuList"
-                :key="sku.id"
-                class="spec-chip"
-                :class="{
-                  active: selectedSku?.id === sku.id,
-                  disabled: sku.stock === 0
-                }"
-                @click="selectSku(sku)"
-              >
-                <div class="spec-chip-top">
-                  <span class="spec-chip-name">{{ sku.skuName || formatSpecInfo(sku.specInfo) || sku.skuCode || '默认' }}</span>
-                  <van-icon v-if="selectedSku?.id === sku.id" name="success" class="spec-chip-check" />
+      <!-- ═══════ 主体：左右分栏 ═══════ -->
+      <div class="detail-body">
+        <!-- 右栏（DOM 在前，移动端先展示：商家 + 商品信息） -->
+        <div class="detail-right">
+          <div class="detail-right-inner">
+            <div class="detail-info">
+              <!-- ═══════ 商家信息条 ═══════ -->
+              <div class="merchant-bar">
+                <div class="mbar-left" @click="goToShop">
+                  <div class="mbar-logo-wrap">
+                    <van-image
+                      v-if="merchantInfo?.shopLogo || spu.shopLogo"
+                      :src="merchantInfo?.shopLogo || spu.shopLogo"
+                      round
+                      width="34"
+                      height="34"
+                      fit="cover"
+                      class="mbar-logo"
+                    />
+                    <span v-else class="mbar-logo-fallback">店</span>
+                    <span class="mbar-badge">自营</span>
+                  </div>
+                  <div class="mbar-info">
+                    <div class="mbar-name-row">
+                      <span class="mbar-name">{{ merchantInfo?.shopName || spu.shopName || '商家店铺' }}</span>
+                      <van-icon name="arrow" class="mbar-arrow" />
+                    </div>
+                    <div class="mbar-meta-row">
+                      <span class="mbar-platform">商城</span>
+                      <span class="mbar-divider">|</span>
+                      <span class="mbar-scores" v-if="merchantDsr?.describeScore">
+                        <span class="mbar-score-item">
+                          <span class="mbar-score-label">描述</span>
+                          <span class="mbar-score-val">{{ merchantDsr.describeScore }}</span>
+                        </span>
+                        <span class="mbar-score-item">
+                          <span class="mbar-score-label">服务</span>
+                          <span class="mbar-score-val">{{ merchantDsr.serviceScore ?? '-' }}</span>
+                        </span>
+                        <span class="mbar-score-item">
+                          <span class="mbar-score-label">物流</span>
+                          <span class="mbar-score-val">{{ merchantDsr.logisticsScore ?? '-' }}</span>
+                        </span>
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <span v-if="sku.price" class="spec-chip-price">&yen;{{ sku.price }}</span>
-                <span v-if="sku.stock === 0" class="spec-chip-nostock">缺货</span>
-                <span v-else-if="sku.stock <= 100" class="spec-chip-warning">仅剩 {{ sku.stock }} 件</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- ═══════ 数量选择 ═══════ -->
-          <div class="quantity-block">
-            <span class="quantity-label">数量</span>
-            <van-stepper
-              v-model="quantity"
-              :min="1"
-              :max="maxQuantity"
-              integer
-              class="quantity-stepper"
-            />
-          </div>
-
-          <!-- ═══════ 操作按钮 ═══════ -->
-          <div class="action-block">
-            <van-button
-              round
-              class="cart-btn"
-              color="linear-gradient(135deg, #e8573a 0%, #f39c12 100%)"
-              :loading="addingCart"
-              @click="addToCart"
-            >加入购物车</van-button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══════ Tab 切换：商品详情 / 用户评价 ═══════ -->
-      <div class="tab-section">
-        <!-- Tab 栏 -->
-        <div class="tab-bar">
-          <div
-            class="tab-item"
-            :class="{ active: activeTab === 'desc' }"
-            @click="activeTab = 'desc'"
-          >商品详情</div>
-          <div
-            class="tab-item"
-            :class="{ active: activeTab === 'review' }"
-            @click="activeTab = 'review'"
-          >用户评价 ({{ mockReviews.length }})</div>
-        </div>
-
-        <!-- 商品详情内容 -->
-        <div v-show="activeTab === 'desc'" class="tab-panel">
-          <div v-if="spu.description" class="desc-content" v-html="spu.description"></div>
-          <van-empty v-else description="暂无商品详情" />
-        </div>
-
-        <!-- 用户评价内容 -->
-        <div v-show="activeTab === 'review'" class="tab-panel">
-          <!-- 筛选标签 -->
-          <div class="review-tags">
-            <span
-              v-for="tag in reviewTags"
-              :key="tag.key"
-              class="review-tag"
-              :class="{ active: reviewFilter === tag.key }"
-              @click="reviewFilter = tag.key"
-            >{{ tag.label }} {{ tag.count }}</span>
-          </div>
-
-          <!-- 评价列表 -->
-          <div v-if="pagedReviews.length > 0" class="review-list">
-            <div
-              v-for="item in pagedReviews"
-              :key="item.id"
-              class="review-item"
-            >
-              <div class="review-item-head">
-                <div class="review-user">
-                  <span class="review-avatar">{{ item.avatar }}</span>
-                  <span class="review-nickname">{{ item.nickname }}</span>
+                <div class="mbar-right">
+                  <van-button round plain size="mini" class="mbar-btn" icon="service-o" @click="contactService">客服</van-button>
+                  <van-button round plain size="mini" class="mbar-btn mbar-btn-shop" icon="shop-o" @click="goToShop">进店</van-button>
                 </div>
-                <span class="review-date">{{ item.date }}</span>
               </div>
-              <div class="review-spec" v-if="item.skuName">{{ item.skuName }}</div>
-              <div class="review-stars">
-                <span v-for="n in 5" :key="n" class="review-star" :class="{ on: n <= item.stars }">★</span>
+
+              <h1 class="goods-name">{{ spu.name }}</h1>
+              <p class="goods-subtitle" v-if="spu.subTitle">{{ spu.subTitle }}</p>
+
+              <div class="info-row">
+                <span class="goods-price">&yen;{{ displayPrice }}</span>
+                <span class="goods-sales" v-if="spu.sales > 0">已售 {{ spu.sales }}</span>
+                <span class="goods-sales" v-else>暂无销量</span>
               </div>
-              <p class="review-content" v-if="item.content">{{ item.content }}</p>
-              <div class="review-images" v-if="item.images && item.images.length > 0">
-                <van-image
-                  v-for="(img, idx) in item.images"
-                  :key="idx"
-                  :src="img"
-                  fit="cover"
-                  class="review-img"
-                  @click="previewReviewImage(item.images, idx)"
+
+              <!-- ═══════ 规格选择 ═══════ -->
+              <div v-if="skuList.length > 0" class="specs-block">
+                <div class="specs-title">规格</div>
+                <div class="specs-list">
+                  <div
+                    v-for="sku in skuList"
+                    :key="sku.id"
+                    class="spec-chip"
+                    :class="{
+                      active: selectedSku?.id === sku.id,
+                      disabled: sku.stock === 0
+                    }"
+                    @click="selectSku(sku)"
+                  >
+                    <div class="spec-chip-top">
+                      <span class="spec-chip-name">{{ sku.skuName || formatSpecInfo(sku.specInfo) || sku.skuCode || '默认' }}</span>
+                      <van-icon v-if="selectedSku?.id === sku.id" name="success" class="spec-chip-check" />
+                    </div>
+                    <span v-if="sku.price" class="spec-chip-price">&yen;{{ sku.price }}</span>
+                    <span v-if="sku.stock === 0" class="spec-chip-nostock">缺货</span>
+                    <span v-else-if="sku.stock <= 100" class="spec-chip-warning">仅剩 {{ sku.stock }} 件</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ═══════ 数量选择 ═══════ -->
+              <div class="quantity-block">
+                <span class="quantity-label">数量</span>
+                <van-stepper
+                  v-model="quantity"
+                  :min="1"
+                  :max="maxQuantity"
+                  integer
+                  class="quantity-stepper"
                 />
               </div>
+
+              <!-- ═══════ 操作按钮 ═══════ -->
+              <div class="action-block">
+                <div class="action-row">
+                  <van-button
+                    round
+                    class="action-btn-cart"
+                    color="linear-gradient(135deg, #e8573a 0%, #f39c12 100%)"
+                    :loading="addingCart"
+                    @click="addToCart"
+                  >加入购物车</van-button>
+                  <van-button
+                    round
+                    class="action-btn-buy"
+                    color="#d63031"
+                    @click="buyNow"
+                  >立即购买</van-button>
+                </div>
+              </div>
             </div>
           </div>
-          <van-empty v-else description="暂无评价" />
+        </div>
 
-          <div class="review-more" v-if="hasMoreReviews">
-            <van-button
-              round
-              plain
-              hairline
-              color="#e8573a"
-              :loading="loadingReviews"
-              @click="loadMoreReviews"
-            >查看更多评价</van-button>
+        <!-- 左栏（DOM 在后，桌面端 row-reverse 展示在左侧）：商品图 + Tab -->
+        <div class="detail-left">
+          <!-- 商品图片 -->
+          <div class="detail-gallery">
+            <!-- 主图大图 -->
+            <div class="gallery-main">
+              <van-image :src="activeImage" fit="cover" class="gallery-main-img" />
+            </div>
+            <!-- 缩略图列表 -->
+            <div class="gallery-thumbs" v-if="spuImages.length > 0">
+              <div
+                v-for="(img, i) in spuImages"
+                :key="i"
+                class="gallery-thumb"
+                :class="{ active: i === activeIndex }"
+                @click="setActiveImage(i)"
+              >
+                <van-image :src="img" fit="cover" class="gallery-thumb-img" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 切换：商品详情 / 用户评价 -->
+          <div class="tab-section">
+            <!-- Tab 栏 -->
+            <div class="tab-bar">
+              <div
+                class="tab-item"
+                :class="{ active: activeTab === 'desc' }"
+                @click="activeTab = 'desc'"
+              >商品详情</div>
+              <div
+                class="tab-item"
+                :class="{ active: activeTab === 'review' }"
+                @click="activeTab = 'review'"
+              >用户评价 ({{ reviewTotal }})</div>
+            </div>
+
+            <!-- 商品详情内容 -->
+            <div v-show="activeTab === 'desc'" class="tab-panel">
+              <div v-if="spu.description" class="desc-content" v-html="spu.description"></div>
+              <van-empty v-else description="暂无商品详情" />
+            </div>
+
+            <!-- 用户评价内容 -->
+            <div v-show="activeTab === 'review'" class="tab-panel">
+              <!-- 筛选标签 -->
+              <div class="review-tags">
+                <span
+                  v-for="tag in reviewTags"
+                  :key="tag.key"
+                  class="review-tag"
+                  :class="{ active: reviewFilter === tag.key }"
+                  @click="setReviewFilter(tag.key)"
+                >{{ tag.label }} {{ tag.count }}</span>
+              </div>
+
+              <!-- 评价列表 -->
+              <div v-if="displayReviews.length > 0" class="review-list">
+                <div
+                  v-for="item in displayReviews"
+                  :key="item.id"
+                  class="review-item"
+                >
+                  <div class="review-item-head">
+                    <div class="review-user">
+                      <van-image v-if="item.avatar" round width="28" height="28" :src="item.avatar" class="review-avatar-img" />
+                      <span v-else class="review-avatar-text"><van-icon name="user-o" size="14" color="#c8c4c0" /></span>
+                      <span class="review-nickname">{{ item.username || '匿名用户' }}</span>
+                    </div>
+                    <span class="review-date">{{ item.createTime?.slice(0, 10) }}</span>
+                  </div>
+                  <div class="review-spec" v-if="item.skuName">{{ item.skuName }}</div>
+                  <div class="review-stars">
+                    <span v-for="n in 5" :key="n" class="review-star" :class="{ on: n <= item.rating }">★</span>
+                  </div>
+                  <p class="review-content" v-if="item.content">{{ item.content }}</p>
+                  <div class="review-images" v-if="item.imageList?.length">
+                    <van-image
+                      v-for="(img, idx) in item.imageList"
+                      :key="idx"
+                      :src="img"
+                      fit="cover"
+                      class="review-img"
+                      @click="previewReviewImage(item.imageList, idx)"
+                    />
+                  </div>
+                </div>
+              </div>
+              <van-empty v-else description="暂无评价" />
+
+              <div class="review-more" v-if="hasMoreReviews">
+                <van-button
+                  round
+                  plain
+                  hairline
+                  color="#e8573a"
+                  :loading="loadingReviews"
+                  @click="loadMoreReviews"
+                >查看更多评价</van-button>
+              </div>
+            </div>
           </div>
         </div>
+
       </div>
     </template>
   </div>
@@ -205,7 +269,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
-import { getSpuDetail } from '../api/goods.js'
+import { getSpuDetail, getSpuReviews } from '../api/goods.js'
+import { getMerchantInfo, getShopDsr } from '../api/merchant.js'
 import { addCart } from '../api/cart.js'
 import { useUserStore } from '../stores/user.js'
 
@@ -321,6 +386,15 @@ async function fetchDetail() {
       spu.value = null
     } else {
       const raw = data.spu || data
+      console.log('[GoodsDetail] raw 字段:', Object.keys(raw))
+      console.log('[GoodsDetail] data 字段:', Object.keys(data))
+      console.log('[GoodsDetail] raw.merchant:', raw.merchant, 'data.merchant:', data.merchant)
+
+      // 从各层级查找商家ID
+      const rawMid = raw.merchantId || raw.merchant_id || raw.shopId || raw.shop_id
+      const dataMid = data.merchantId || data.merchant_id || data.shopId || data.shop_id
+      const merchantObj = raw.merchant || data.merchant || raw.shop || data.shop || null
+
       spu.value = {
         id: raw.id,
         name: raw.name || raw.title || '',
@@ -331,6 +405,9 @@ async function fetchDetail() {
         images: raw.imageList || raw.images || raw.imgs || raw.pics || raw.imageUrls || '',
         description: raw.description || raw.desc || raw.detail || '',
         skuList: data.skuList || raw.skuList || raw.skus || raw.skuVOList || [],
+        merchantId: rawMid || dataMid || merchantObj?.id || merchantObj?.merchantId || 0,
+        shopName: raw.shopName || raw.merchantName || raw.shop_name || merchantObj?.shopName || merchantObj?.name || '',
+        shopLogo: raw.shopLogo || raw.merchantLogo || merchantObj?.shopLogo || merchantObj?.logo || '',
       }
     }
   } catch (e) {
@@ -339,6 +416,7 @@ async function fetchDetail() {
     spu.value = null
   } finally {
     loading.value = false
+    if (spu.value?.merchantId) fetchMerchantInfo()
   }
 }
 
@@ -421,68 +499,158 @@ async function addToCart() {
   }
 }
 
-// ── 用户评价（Mock 数据，后续对接后端） ──
+async function buyNow() {
+  if (!userStore.isLogin) {
+    try {
+      await showConfirmDialog({
+        title: '提示',
+        message: '请先登录后再购买',
+        confirmButtonText: '去登录',
+        cancelButtonText: '再想想',
+        confirmButtonColor: '#e8573a',
+      })
+      router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    } catch { /* cancel */ }
+    return
+  }
+  if (skuList.value.length > 0 && !selectedSku.value) {
+    showToast('请选择规格')
+    return
+  }
+  const items = [{
+    spuId: spu.value.id,
+    spuName: spu.value.name,
+    skuId: selectedSku.value?.id || 0,
+    skuName: selectedSku.value?.skuName || '',
+    price: selectedSku.value?.price || spu.value.price || 0,
+    image: selectedSku.value?.image || spu.value.mainImage || '',
+    quantity: quantity.value,
+  }]
+  router.push({
+    path: '/order',
+    query: { buyNow: '1', items: JSON.stringify(items) },
+  })
+}
+
+// ── 商家信息 ──
+const merchantInfo = ref(null)
+const merchantDsr = ref(null)
+
+async function fetchMerchantInfo() {
+  const mid = spu.value?.merchantId
+  if (!mid) return
+  try {
+    const [info, dsr] = await Promise.all([
+      getMerchantInfo(mid).catch(() => null),
+      getShopDsr(mid).catch(() => null),
+    ])
+    if (info) merchantInfo.value = info
+    if (dsr) merchantDsr.value = dsr
+  } catch {
+    // 静默
+  }
+}
+
+function merchantStarClass(pos, score) {
+  const s = Number(score || 0)
+  if (pos <= Math.floor(s)) return 'full'
+  if (pos === Math.ceil(s) && s % 1 >= 0.3) return 'half'
+  return ''
+}
+
+function goToShop() {
+  const name = merchantInfo.value?.shopName || spu.value?.shopName
+  if (name) {
+    router.push({ path: '/search', query: { keyword: name } })
+  } else {
+    showToast('店铺主页开发中')
+  }
+}
+
+function contactService() {
+  showToast('客服功能开发中')
+}
+
+// ── 用户评价（从 API 获取） ──
 const activeTab = ref('desc')
-
-const mockReviews = [
-  { id: 1, nickname: '张三', avatar: '👤', skuName: '颜色:红色 · 尺码:XL', stars: 5, content: '质量很好，颜色和图片一样，非常满意！面料柔软舒适，穿着很合身，物流也快。', images: ['https://pics0.baidu.com/feed/024f78f0f736afc315d66d1ba63dfbd4b64512ad.jpeg?token=c4633f7e6f4fd69ffc114c41cf36eed2'], date: '2024-06-01' },
-  { id: 2, nickname: '李四', avatar: '😊', skuName: '颜色:蓝色', stars: 4, content: '物流很快，穿着舒服。就是颜色比图片稍微深了一点，不过整体满意。', images: [], date: '2024-05-28' },
-  { id: 3, nickname: '王五', avatar: '👍', skuName: '', stars: 5, content: '性价比很高，推荐购买！已经是第二次买了。', images: [], date: '2024-05-25' },
-  { id: 4, nickname: '赵六', avatar: '💪', skuName: '颜色:红色 · 尺码:L', stars: 3, content: '一般般，这个价位算可以了。线头有点多。', images: [], date: '2024-05-20' },
-  { id: 5, nickname: '小明', avatar: '🎯', skuName: '', stars: 2, content: '不太满意，材质和描述有差距。', images: [], date: '2024-05-15' },
-  { id: 6, nickname: '小红', avatar: '🌸', skuName: '颜色:蓝色 · 尺码:M', stars: 5, content: '超级好看！朋友都问我要链接，会回购的！', images: ['https://pics0.baidu.com/feed/024f78f0f736afc315d66d1ba63dfbd4b64512ad.jpeg?token=c4633f7e6f4fd69ffc114c41cf36eed2', 'https://pics0.baidu.com/feed/024f78f0f736afc315d66d1ba63dfbd4b64512ad.jpeg?token=c4633f7e6f4fd69ffc114c41cf36eed2'], date: '2024-05-10' },
-  { id: 7, nickname: '大刘', avatar: '🏃', skuName: '颜色:红色 · 尺码:XXL', stars: 4, content: '做工不错，细节处理到位。活动价买的，非常划算。', images: [], date: '2024-05-08' },
-  { id: 8, nickname: '阿花', avatar: '💐', skuName: '', stars: 5, content: '质量超乎预期！', images: [], date: '2024-05-01' },
-]
-
+const reviewList = ref([])
+const reviewTotal = ref(0)
+const reviewPages = ref(0)
 const reviewFilter = ref('all')
 const reviewPage = ref(1)
-const pageSize = 3
+const pageSize = 5
+const loadingReviews = ref(false)
 
-const reviewTags = computed(() => [
-  { key: 'all', label: '全部', count: mockReviews.length },
-  { key: 'img', label: '有图', count: mockReviews.filter(r => r.images && r.images.length > 0).length },
-  { key: 'good', label: '好评', count: mockReviews.filter(r => r.stars >= 4).length },
-  { key: 'bad', label: '差评', count: mockReviews.filter(r => r.stars <= 2).length },
-])
+const reviewTags = computed(() => {
+  const all = reviewList.value
+  return [
+    { key: 'all', label: '全部', count: all.length },
+    { key: 'img', label: '有图', count: all.filter(r => r.imageList?.length).length },
+    { key: 'good', label: '好评', count: all.filter(r => r.rating >= 4).length },
+    { key: 'mid', label: '中评', count: all.filter(r => r.rating === 3).length },
+    { key: 'bad', label: '差评', count: all.filter(r => r.rating <= 2).length },
+  ]
+})
 
 const filteredReviews = computed(() => {
+  const all = reviewList.value
   switch (reviewFilter.value) {
-    case 'img': return mockReviews.filter(r => r.images && r.images.length > 0)
-    case 'good': return mockReviews.filter(r => r.stars >= 4)
-    case 'bad': return mockReviews.filter(r => r.stars <= 2)
-    default: return mockReviews
+    case 'img': return all.filter(r => r.imageList?.length)
+    case 'good': return all.filter(r => r.rating >= 4)
+    case 'bad': return all.filter(r => r.rating <= 2)
+    default: return all
   }
 })
 
-const pagedReviews = computed(() => {
+const displayReviews = computed(() => {
   return filteredReviews.value.slice(0, reviewPage.value * pageSize)
 })
 
 const hasMoreReviews = computed(() => {
-  return pagedReviews.value.length < filteredReviews.value.length
+  return displayReviews.value.length < filteredReviews.value.length
 })
 
-const loadingReviews = ref(false)
+async function fetchReviews() {
+  const spuId = route.params.id
+  if (!spuId) return
+  try {
+    const res = await getSpuReviews(spuId, { pageNum: 1, pageSize: 50 })
+    reviewList.value = res?.records || []
+    reviewTotal.value = res?.total || 0
+    reviewPages.value = res?.pages || 0
+  } catch {
+    reviewList.value = []
+    reviewTotal.value = 0
+  }
+}
+
+function setReviewFilter(key) {
+  reviewFilter.value = key
+  reviewPage.value = 1
+}
 
 function loadMoreReviews() {
   loadingReviews.value = true
   setTimeout(() => {
     reviewPage.value++
     loadingReviews.value = false
-  }, 400)
+  }, 300)
 }
 
 function previewReviewImage(images, index) {
-  // 简易预览：后续可接入 Vant ImagePreview
   window.open(images[index], '_blank')
 }
 
+// 切换到评价 tab 时按需加载
+watch(activeTab, (tab) => {
+  if (tab === 'review' && reviewList.value.length === 0) fetchReviews()
+})
+
 // ── 生命周期 ──
-onMounted(fetchDetail)
+onMounted(() => { fetchDetail(); fetchReviews() })
 // keep-alive 场景下路由参数变化时重新加载
 watch(() => route.params.id, () => {
-  if (route.name === 'GoodsDetail') fetchDetail()
+  if (route.name === 'GoodsDetail') { fetchDetail(); fetchReviews() }
 })
 </script>
 
@@ -549,12 +717,21 @@ watch(() => route.params.id, () => {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   主体：左图右信息
+   主体：左右分栏
    ══════════════════════════════════════════════════════════════ */
-.detail-main {
-  display: flex;
-  flex-direction: column;
+.detail-body {
+  display: block;
   background: #fff;
+}
+.detail-left {
+  width: 100%;
+}
+.detail-right {
+  width: 100%;
+}
+.detail-right-inner {
+  /* desktop sticky 在下方 media 中启用 */
+  min-width: 0;
 }
 
 /* ── 图片画廊：大图 + 缩略图 ── */
@@ -748,6 +925,27 @@ watch(() => route.params.id, () => {
 .action-block {
   padding-top: 4px;
 }
+.action-row {
+  display: flex;
+  gap: 10px;
+}
+.action-btn-cart {
+  flex: 1;
+  height: 46px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border: none;
+  box-shadow: 0 4px 14px rgba(232,87,58,0.3);
+}
+.action-btn-buy {
+  flex: 1;
+  height: 46px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border: none;
+}
 .cart-btn {
   width: 100%;
   height: 46px;
@@ -756,6 +954,143 @@ watch(() => route.params.id, () => {
   letter-spacing: 0.5px;
   border: none;
   box-shadow: 0 4px 14px rgba(232,87,58,0.3);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   商家信息条（位于商品标题上方）
+   ══════════════════════════════════════════════════════════════ */
+.merchant-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #faf8f6;
+  border-radius: 10px;
+  border: 1px solid #f0ece8;
+}
+.mbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.mbar-logo-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.mbar-logo {
+  display: block;
+  border-radius: 50%;
+}
+.mbar-logo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+.mbar-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #e8573a;
+  color: #fff;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.mbar-info {
+  flex: 1;
+  min-width: 0;
+}
+.mbar-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mbar-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.mbar-arrow {
+  font-size: 12px;
+  color: #c8c4c0;
+  flex-shrink: 0;
+}
+.mbar-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 11px;
+}
+.mbar-platform {
+  background: #e8573a;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+.mbar-divider {
+  color: #e0dcd8;
+  font-size: 10px;
+}
+.mbar-scores {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mbar-score-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+}
+.mbar-score-label {
+  color: #9a9aae;
+}
+.mbar-score-val {
+  font-weight: 700;
+  color: #e8573a;
+}
+.mbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.mbar-btn {
+  height: 28px !important;
+  font-size: 11px !important;
+  padding: 0 8px !important;
+  border-color: #e0dcd8 !important;
+  color: #5a5a6e !important;
+  border-width: 1px !important;
+}
+.mbar-btn :deep(.van-icon) {
+  font-size: 13px !important;
+}
+.mbar-btn-shop {
+  border-color: #e8573a !important;
+  color: #e8573a !important;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -962,7 +1297,7 @@ watch(() => route.params.id, () => {
   }
 }
 
-/* ── 桌面端：左右双栏 ── */
+/* ── 桌面端：左右双栏（flex row-reverse 使 DOM 右-左显示为左-右） ── */
 @media (min-width: 768px) {
   .detail-top-bar {
     padding: 16px 32px;
@@ -971,25 +1306,38 @@ watch(() => route.params.id, () => {
     font-size: 20px;
   }
 
-  .detail-main {
-    flex-direction: row;
-    align-items: flex-start;
+  .detail-body {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px;
   }
-  .detail-gallery {
-    flex: 0 0 50%;
+  .detail-left {
+    flex: 1;
+    min-width: 0;
+  }
+  .detail-right {
+    width: 360px;
+    flex-shrink: 0;
+  }
+  .detail-right-inner {
     position: sticky;
     top: 70px;
-    padding: 20px;
+  }
+
+  .detail-gallery {
+    padding: 0;
   }
   .gallery-main-img {
     aspect-ratio: 1;
   }
 
   .detail-info {
-    flex: 1;
-    min-height: 50vh;
-    padding: 28px 32px 32px;
-    overflow-y: auto;
+    padding: 0;
+    overflow-y: visible;
+    min-height: 0;
   }
   .goods-name {
     font-size: 24px;
@@ -1008,18 +1356,18 @@ watch(() => route.params.id, () => {
 
   .tab-panel {
     padding: 28px 32px 40px;
-    max-width: 900px;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
   }
 }
 
 @media (min-width: 1024px) {
-  .detail-gallery {
-    flex: 0 0 45%;
-    padding: 24px;
+  .detail-body {
+    gap: 32px;
+    padding: 0 40px;
   }
-  .detail-info {
-    padding: 36px 40px 40px;
+  .detail-right {
+    width: 400px;
   }
   .goods-name {
     font-size: 28px;
@@ -1027,14 +1375,14 @@ watch(() => route.params.id, () => {
   .goods-price {
     font-size: 36px;
   }
-  .tab-panel {
-    max-width: 960px;
-  }
 }
 
 @media (min-width: 1400px) {
-  .detail-gallery {
-    flex: 0 0 40%;
+  .detail-body {
+    gap: 40px;
+  }
+  .detail-right {
+    width: 420px;
   }
   .gallery-main-img {
     aspect-ratio: 4/3;

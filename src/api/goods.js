@@ -39,3 +39,8 @@ export function updateSpu(id, data) {
 export function toggleSpuStatus(id, status) {
   return request.put(`/spu/${id}/status/${status}`)
 }
+
+/** 查询商品评价列表 */
+export function getSpuReviews(spuId, params = {}) {
+  return request.get(`/review/spu/${spuId}`, { params })
+}

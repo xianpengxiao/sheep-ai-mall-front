@@ -78,11 +78,18 @@
               <van-button round size="small" plain class="action-btn" @click="goDetail(order.id)">查看详情</van-button>
             </template>
             <template v-else-if="order.status === 2">
-              <van-button round size="small" plain class="action-btn" @click="goLogistics(order.id)">查看物流</van-button>
-              <van-button round size="small" plain class="action-btn" @click="goDetail(order.id)">确认收货</van-button>
+              <van-button round size="small" plain class="action-btn" @click="handleComplete(order)">确认收货</van-button>
             </template>
             <template v-else-if="order.status === 3">
-              <van-button round size="small" plain class="action-btn" @click="goReview(order)">评价</van-button>
+              <template v-if="orderReviewState(order) === 1">
+                <van-button round size="small" plain class="action-btn" @click="viewReview(order)">查看我的评论</van-button>
+              </template>
+              <template v-else-if="orderReviewState(order) === 2">
+                <van-button round size="small" plain disabled class="action-btn action-btn-disabled" @click="showToast('该订单时间过于久远，无法评论')">无法评论</van-button>
+              </template>
+              <template v-else>
+                <van-button round size="small" plain class="action-btn" @click="openReview(order)">评价</van-button>
+              </template>
               <van-button round size="small" plain class="action-btn" @click="goDetail(order.id)">查看详情</van-button>
             </template>
             <template v-else-if="order.status === 4">
@@ -112,6 +119,169 @@
         />
       </div>
     </template>
+
+    <!-- ═══════ 评价弹窗 ═══════ -->
+    <van-popup
+      v-model:show="showReview"
+      position="bottom"
+      round
+      :style="{ maxHeight: '80vh' }"
+      closeable
+      close-icon-position="top-left"
+    >
+      <div class="review-popup">
+        <div class="review-popup-title">评价商品</div>
+
+        <!-- 被评价的商品 -->
+        <div class="review-items" v-if="reviewingItems.length > 0">
+          <div v-for="(item, i) in reviewingItems" :key="i" class="review-item">
+            <van-image
+              :src="item.image || item.skuImage"
+              width="44"
+              height="44"
+              fit="cover"
+              class="review-item-img"
+            />
+            <div class="review-item-info">
+              <div class="review-item-name van-multi-ellipsis--l2">{{ item.spuName || item.skuName }}</div>
+              <div class="review-item-spec" v-if="item.skuName && item.skuName !== item.spuName">{{ item.skuName }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DSR 三维评分 -->
+        <div class="review-dsr">
+          <div class="review-dsr-item">
+            <span class="review-dsr-label">描述相符</span>
+            <van-rate v-model="reviewForm.describeScore" :count="5" size="20" color="#f39c12" void-color="#ddd" />
+          </div>
+          <div class="review-dsr-item">
+            <span class="review-dsr-label">服务态度</span>
+            <van-rate v-model="reviewForm.serviceScore" :count="5" size="20" color="#f39c12" void-color="#ddd" />
+          </div>
+          <div class="review-dsr-item">
+            <span class="review-dsr-label">物流服务</span>
+            <van-rate v-model="reviewForm.logisticsScore" :count="5" size="20" color="#f39c12" void-color="#ddd" />
+          </div>
+        </div>
+
+        <!-- 图片上传（参考头像上传模式） -->
+        <div class="review-uploader-block">
+          <div class="review-uploader-label">上传图片（选填）</div>
+          <div class="review-image-grid">
+            <div v-for="(img, i) in reviewImageList" :key="i" class="review-image-cell">
+              <van-image :src="img.preview" width="72" height="72" fit="cover" class="review-image-preview" />
+              <van-icon name="close" class="review-image-remove" @click="removeReviewImage(i)" />
+            </div>
+            <div v-if="reviewImageList.length < 6" class="review-image-cell review-image-add" @click="reviewFileInputRef?.click()">
+              <van-icon name="photograph" size="28" color="#c8c4c0" />
+            </div>
+          </div>
+          <input ref="reviewFileInputRef" type="file" accept="image/*" multiple class="file-input-hidden" @change="onReviewFileSelected" />
+        </div>
+
+        <!-- 评价内容 -->
+        <van-field
+          v-model="reviewForm.content"
+          type="textarea"
+          placeholder="说说你的购物体验…"
+          :maxlength="500"
+          rows="4"
+          show-word-limit
+          class="review-textarea"
+        />
+
+        <van-button
+          round
+          type="primary"
+          color="linear-gradient(135deg, #e8573a 0%, #f39c12 100%)"
+          class="review-submit"
+          :loading="reviewSubmitting"
+          @click="handleSubmitReview"
+        >提交评价</van-button>
+      </div>
+    </van-popup>
+
+    <!-- ═══════ 查看我的评论弹窗 ═══════ -->
+    <van-popup
+      v-model:show="showReviewDetail"
+      position="bottom"
+      round
+      :style="{ maxHeight: '80vh' }"
+      closeable
+      close-icon-position="top-left"
+    >
+      <div class="state-wrap" v-if="loadingDetail" style="min-height:200px">
+        <van-loading size="24" color="#e8573a">加载中...</van-loading>
+      </div>
+      <div class="review-popup" v-else-if="reviewDetail">
+        <div class="review-popup-title">我的评论</div>
+
+        <!-- 商品信息 -->
+        <div class="review-items">
+          <div class="review-item">
+            <van-image
+              :src="reviewDetail.skuImage || reviewDetail.spuImage"
+              width="44"
+              height="44"
+              fit="cover"
+              class="review-item-img"
+            />
+            <div class="review-item-info">
+              <div class="review-item-name van-multi-ellipsis--l2">{{ reviewDetail.spuName }}</div>
+              <div class="review-item-spec" v-if="reviewDetail.skuName">{{ reviewDetail.skuName }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DSR 评分（只读） -->
+        <div class="review-dsr">
+          <div class="review-dsr-item">
+            <span class="review-dsr-label">描述相符</span>
+            <van-rate v-model="reviewDetail.describeScore" :count="5" size="20" color="#f39c12" void-color="#ddd" readonly />
+          </div>
+          <div class="review-dsr-item">
+            <span class="review-dsr-label">服务态度</span>
+            <van-rate v-model="reviewDetail.serviceScore" :count="5" size="20" color="#f39c12" void-color="#ddd" readonly />
+          </div>
+          <div class="review-dsr-item">
+            <span class="review-dsr-label">物流服务</span>
+            <van-rate v-model="reviewDetail.logisticsScore" :count="5" size="20" color="#f39c12" void-color="#ddd" readonly />
+          </div>
+        </div>
+
+        <!-- 评价内容 -->
+        <p class="review-detail-content">{{ reviewDetail.content }}</p>
+
+        <!-- 评价图片 -->
+        <div class="review-image-grid" v-if="reviewDetail.imageList?.length">
+          <div v-for="(img, i) in reviewDetail.imageList" :key="i" class="review-image-cell review-image-cell-done">
+            <van-image :src="img" width="72" height="72" fit="cover" class="review-image-preview" />
+          </div>
+        </div>
+
+        <!-- 评价时间 -->
+        <div class="review-detail-time">{{ formatTime(reviewDetail.createTime) }}</div>
+
+        <!-- 操作按钮 -->
+        <div class="review-detail-actions">
+          <van-button
+            round
+            plain
+            size="small"
+            class="review-detail-btn"
+            @click="handleToggleStatus"
+          >{{ reviewDetail.status === 1 ? '隐藏评论' : '显示评论' }}</van-button>
+          <van-button
+            round
+            plain
+            size="small"
+            class="review-detail-btn review-detail-btn-danger"
+            @click="handleDeleteReview"
+          >删除评论</van-button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -119,7 +289,8 @@
 import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant'
-import { getOrderList, cancelOrder } from '../../api/order.js'
+import { getOrderList, cancelOrder, completeOrder, submitReview, getOrderReview, updateReviewStatus, deleteReview } from '../../api/order.js'
+import { uploadImage } from '../../api/merchant.js'
 import NavBar from '../../components/NavBar.vue'
 
 const router = useRouter()
@@ -159,6 +330,101 @@ function orderItems(order) {
 
 function itemCount(order) {
   return orderItems(order).reduce((s, i) => s + (i.quantity || 0), 0)
+}
+
+// ── 订单评价状态：0 可评价 / 1 已评价 / 2 已过期 ──
+const REVIEWED_KEY = 'order_reviewed_ids'
+const reviewedIds = ref(new Set(loadReviewedIds()))
+
+function loadReviewedIds() {
+  try {
+    const raw = localStorage.getItem(REVIEWED_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveReviewedId(id) {
+  reviewedIds.value.add(id)
+  localStorage.setItem(REVIEWED_KEY, JSON.stringify([...reviewedIds.value]))
+}
+
+function orderReviewState(order) {
+  if (!order) return 0
+  // 本地已提交评价
+  if (reviewedIds.value.has(order.id)) return 1
+  // 后端返回的字段
+  if (order.reviewStatus === 1 || order.reviewed) return 1
+  if (order.reviewStatus === 2) return 2
+  const items = orderItems(order)
+  if (items.length === 0) return 0
+  if (items.every(i => i.reviewStatus === 1 || i.reviewed)) return 1
+  if (items.some(i => i.reviewStatus === 2)) return 2
+  return 0
+}
+
+const showReviewDetail = ref(false)
+const reviewDetail = ref(null)
+const loadingDetail = ref(false)
+
+async function viewReview(order) {
+  const items = orderItems(order)
+  if (items.length === 0) return
+  loadingDetail.value = true
+  showReviewDetail.value = true
+  reviewDetail.value = null
+  try {
+    // 取第一个有评价的商品明细
+    const reviewedItem = items.find(i => i.reviewStatus === 1 || i.reviewed) || items[0]
+    const data = await getOrderReview(reviewedItem.id)
+    reviewDetail.value = data
+  } catch {
+    showToast('获取评价失败')
+    showReviewDetail.value = false
+  } finally {
+    loadingDetail.value = false
+  }
+}
+
+const toggling = ref(false)
+async function handleToggleStatus() {
+  const review = reviewDetail.value
+  if (!review || toggling.value) return
+  toggling.value = true
+  const newStatus = review.status === 1 ? 0 : 1
+  try {
+    await updateReviewStatus(review.id, newStatus)
+    reviewDetail.value = { ...review, status: newStatus }
+    showToast(newStatus === 1 ? '评论已显示' : '评论已隐藏')
+  } catch {
+    showToast('操作失败')
+  } finally {
+    toggling.value = false
+  }
+}
+
+async function handleDeleteReview() {
+  const review = reviewDetail.value
+  if (!review) return
+  try {
+    await showConfirmDialog({
+      title: '提示',
+      message: '确定要删除该评论吗？删除后不可恢复。',
+      confirmButtonText: '确定删除',
+      cancelButtonText: '再想想',
+      confirmButtonColor: '#d63031',
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteReview(review.id)
+    showToast('评论已删除')
+    saveReviewedId(reviewingOrder.value?.id)
+    showReviewDetail.value = false
+    fetchOrders()
+  } catch {
+    showToast('删除失败')
+  }
 }
 
 // ── 获取状态筛选参数 ──
@@ -216,8 +482,103 @@ function goLogistics(id) {
   showToast('物流功能开发中')
 }
 
-function goReview(order) {
-  showToast('评价功能开发中')
+// ── 评价 ──
+const showReview = ref(false)
+const reviewingOrder = ref(null)
+const reviewSubmitting = ref(false)
+const reviewFileInputRef = ref(null)
+/** 图片列表：{ preview: base64, url: 服务器地址, uploading: boolean } */
+const reviewImageList = ref([])
+const reviewForm = ref({
+  describeScore: 5,
+  serviceScore: 5,
+  logisticsScore: 5,
+  content: '',
+})
+
+const reviewingItems = computed(() => {
+  const order = reviewingOrder.value
+  if (!order) return []
+  return orderItems(order)
+})
+
+function openReview(order) {
+  const items = orderItems(order)
+  if (items.length === 0) { showToast('暂无待评价商品'); return }
+  reviewingOrder.value = order
+  reviewForm.value = { describeScore: 5, serviceScore: 5, logisticsScore: 5, content: '' }
+  reviewImageList.value = []
+  showReview.value = true
+}
+
+/** 选择文件：存 File 对象用于预览和上传 */
+function onReviewFileSelected(e) {
+  const files = Array.from(e.target.files || [])
+  const remaining = 6 - reviewImageList.value.length
+  for (const file of files.slice(0, remaining)) {
+    const reader = new FileReader()
+    const entry = { preview: '', file }
+    reviewImageList.value.push(entry)
+    reader.onload = (ev) => { entry.preview = ev.target?.result || '' }
+    reader.readAsDataURL(file)
+  }
+  e.target.value = ''
+}
+
+function removeReviewImage(index) {
+  reviewImageList.value.splice(index, 1)
+}
+
+async function handleSubmitReview() {
+  const orderId = reviewingOrder.value?.id
+  const items = reviewingItems.value
+  if (!orderId || items.length === 0) return
+
+  reviewSubmitting.value = true
+
+  // 1. 上传所有图片，收集 URL
+  const imageList = []
+  for (const img of reviewImageList.value) {
+    if (!img.file) continue
+    try {
+      const res = await uploadImage(img.file, 'goods')
+      const url = res?.data?.url || res?.url || res?.data || res || ''
+      if (url) imageList.push(url)
+    } catch {
+      showToast('部分图片上传失败')
+    }
+  }
+
+  // 2. 提交评价
+  let successCount = 0
+  for (const item of items) {
+    try {
+      await submitReview({
+        orderId,
+        orderItemId: item.id,
+        spuId: item.spuId,
+        skuId: item.skuId || item.sku_id || 0,
+        describeScore: reviewForm.value.describeScore,
+        serviceScore: reviewForm.value.serviceScore,
+        logisticsScore: reviewForm.value.logisticsScore,
+        content: reviewForm.value.content || undefined,
+        imageList: imageList.length > 0 ? imageList : undefined,
+      })
+      successCount++
+    } catch (e) {
+      console.error(`[Review] 评价商品[${item.spuName}]失败:`, e)
+    }
+  }
+
+  reviewSubmitting.value = false
+  if (successCount > 0) {
+    showToast(`评价成功（${successCount}/${items.length}）`)
+    saveReviewedId(orderId)
+    showReview.value = false
+    fetchOrders()
+  } else {
+    showToast('评价提交失败，请重试')
+  }
 }
 
 // ── 取消订单 ──
@@ -238,6 +599,30 @@ async function handleCancel(order) {
     await cancelOrder(order.id)
     closeToast()
     showToast('订单已取消')
+    fetchOrders()
+  } catch {
+    closeToast()
+  }
+}
+
+// ── 确认收货 ──
+async function handleComplete(order) {
+  try {
+    await showConfirmDialog({
+      title: '提示',
+      message: '确认收到商品了吗？',
+      confirmButtonText: '确认',
+      cancelButtonText: '再想想',
+      confirmButtonColor: '#e8573a',
+    })
+  } catch {
+    return
+  }
+  showLoadingToast({ message: '处理中...', forbidClick: true, duration: 0 })
+  try {
+    await completeOrder(order.id)
+    closeToast()
+    showToast('已确认收货')
     fetchOrders()
   } catch {
     closeToast()
@@ -426,6 +811,10 @@ onActivated(() => {
   border-color: #e8573a;
   color: #e8573a;
 }
+.action-btn-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* ── 分页 ── */
 .pagination-wrap {
@@ -468,5 +857,189 @@ onActivated(() => {
 .pagination-wrap :deep(.van-pagination__next) {
   color: #1a1a2e;
   font-weight: 500;
+}
+
+/* ── 评价弹窗 ── */
+.review-popup {
+  padding: 16px 20px 28px;
+}
+.review-popup-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.review-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 12px;
+  background: #faf8f6;
+  border-radius: 10px;
+}
+.review-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.review-item-img {
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: #f0ece8;
+}
+.review-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.review-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+  line-height: 1.35;
+}
+.review-item-spec {
+  font-size: 11px;
+  color: #bababa;
+  margin-top: 2px;
+}
+.review-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.review-field-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+.review-dsr {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 14px;
+  background: #faf8f6;
+  border-radius: 10px;
+}
+.review-dsr-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.review-dsr-label {
+  font-size: 13px;
+  color: #5a5a6e;
+}
+.review-textarea {
+  padding: 0;
+  margin-bottom: 20px;
+}
+.review-textarea :deep(.van-field__control) {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.review-uploader-block {
+  margin-bottom: 14px;
+}
+.review-uploader-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 10px;
+}
+.review-image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.review-image-cell {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.review-image-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.review-image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
+}
+.review-image-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f3f0;
+  border: 1.5px dashed #e0dcd8;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.review-image-add:active {
+  border-color: #e8573a;
+}
+.review-detail-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1a1a2e;
+  margin: 0 0 14px;
+  white-space: pre-wrap;
+}
+.review-detail-time {
+  font-size: 12px;
+  color: #bababa;
+  margin-top: 12px;
+  text-align: right;
+}
+.review-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #f0ece8;
+}
+.review-detail-btn {
+  height: 30px !important;
+  font-size: 12px !important;
+  padding: 0 14px !important;
+  border-color: #e0dcd8 !important;
+  color: #5a5a6e !important;
+}
+.review-detail-btn-danger {
+  border-color: #d63031 !important;
+  color: #d63031 !important;
+}
+.review-image-cell-done {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f0ece8;
+}
+.file-input-hidden {
+  display: none;
+}
+.review-submit {
+  width: 100%;
+  height: 44px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
 }
 </style>

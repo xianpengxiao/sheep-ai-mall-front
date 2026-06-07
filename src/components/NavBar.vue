@@ -4,7 +4,8 @@
     :left-arrow="showBack"
     @click-left="handleBack"
   >
-    <template v-if="$slots.right" #right>
+    <template #right>
+      <van-icon name="home-o" size="20" class="nav-home-btn" @click="goHome" style="cursor:pointer" />
       <slot name="right" />
     </template>
     <template v-if="$slots.left" #left>
@@ -28,5 +29,8 @@ function handleBack() {
   emit('back')
   if (window.history.length > 1) router.back()
   else router.replace('/')
+}
+function goHome() {
+  router.push('/')
 }
 </script>

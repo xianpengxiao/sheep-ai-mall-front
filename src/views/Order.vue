@@ -247,6 +247,18 @@ function filterItems(list, skuIds) {
 
 // ── 加载数据 ──
 async function fetchOrderItems() {
+  // ── 立即购买模式：从 query 解析商品数据 ──
+  if (route.query.buyNow === '1' && route.query.items) {
+    try {
+      items.value = JSON.parse(route.query.items)
+      loading.value = false
+      return
+    } catch (e) {
+      console.error('[Order] 解析立即购买数据失败:', e)
+    }
+  }
+
+  // ── 购物车模式 ──
   const skuIdsStr = route.query.skuIds
   if (!skuIdsStr) {
     loading.value = false

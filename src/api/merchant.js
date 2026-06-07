@@ -50,10 +50,30 @@ export function getShopOrders(params) {
 
 /** 店铺营收统计 */
 export function getShopStats() {
-  return request.get('/merchant/stats')
+  return request.get('/merchant/stat/income')
 }
 
 /** 店铺评价列表 */
 export function getShopReviews(params) {
   return request.get('/merchant/review/page', { params })
+}
+
+/** 获取 DSR 趋势（近30天折线图数据） */
+export function getDsrTrend() {
+  return request.get('/merchant/stat/dsr')
+}
+
+/** 查询指定店铺的 DSR 三维评分 */
+export function getShopDsr(id) {
+  return request.get(`/merchant/${id}/dsr`)
+}
+
+/** 获取商家公开信息（买家端，需登录） */
+export function getMerchantInfo(id) {
+  return request.get(`/merchant/${id}`)
+}
+
+/** 切换营业状态 */
+export function updateShopStatus() {
+  return request.put('/merchant/shop/status')
 }

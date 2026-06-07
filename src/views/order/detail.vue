@@ -119,6 +119,14 @@
           class="bottom-btn"
           @click="goPay"
         >立即支付</van-button>
+        <van-button
+          v-else-if="order.status === 2"
+          round
+          type="primary"
+          color="linear-gradient(135deg, #e8573a 0%, #f39c12 100%)"
+          class="bottom-btn"
+          @click="handleComplete"
+        >确认收货</van-button>
       </div>
     </template>
 
@@ -134,8 +142,8 @@
 <script setup>
 import { ref, computed, watch, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { showToast } from 'vant'
-import { getOrderDetail } from '../../api/order.js'
+import { showToast, showConfirmDialog, showLoadingToast, closeToast } from 'vant'
+import { getOrderDetail, completeOrder } from '../../api/order.js'
 import NavBar from '../../components/NavBar.vue'
 
 const router = useRouter()
@@ -158,13 +166,14 @@ const statusLabel = computed(() => {
 // ── 是否显示底部操作按钮 ──
 const showActions = computed(() => {
   if (!order.value) return false
-  // 待支付且未超时（15分钟）
+  // 待支付（15分钟超时）或待收货
   if (order.value.status === 0) {
     if (!order.value.createTime) return true
     const created = new Date(order.value.createTime).getTime()
     const expiredAt = created + 15 * 60 * 1000
     return Date.now() < expiredAt
   }
+  if (order.value.status === 2) return true
   return false
 })
 
@@ -220,11 +229,37 @@ function goPay() {
   })
 }
 
-// 路由参数变化时重新加载（keep-alive 缓存下 onMounted 只执行一次）
-watch(() => route.params.id, fetchDetail, { immediate: true })
+// ── 确认收货 ──
+async function handleComplete() {
+  try {
+    await showConfirmDialog({
+      title: '提示',
+      message: '确认收到商品了吗？',
+      confirmButtonText: '确认',
+      cancelButtonText: '再想想',
+      confirmButtonColor: '#e8573a',
+    })
+  } catch {
+    return
+  }
+  showLoadingToast({ message: '处理中...', forbidClick: true, duration: 0 })
+  try {
+    await completeOrder(order.value.id)
+    closeToast()
+    showToast('已确认收货')
+    fetchDetail()
+  } catch {
+    closeToast()
+  }
+}
+
+// 仅当当前路由是自己时才重新加载，避免被其他路由的 id 参数误触
+watch(() => route.params.id, (id) => {
+  if (route.name === 'OrderDetail' && id) fetchDetail()
+}, { immediate: true })
 // keep-alive 重新激活时刷新
 onActivated(() => {
-  fetchDetail()
+  if (route.name === 'OrderDetail') fetchDetail()
 })
 </script>
 

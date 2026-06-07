@@ -174,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import { useUserStore } from '../../stores/user.js'
@@ -359,6 +359,17 @@ onMounted(async () => {
   }
 })
 
+// keep-alive 重新激活时刷新商家状态
+onActivated(async () => {
+  if (!userStore.isLogin) { merchantVerified.value = null; return }
+  try {
+    await getShopInfo()
+    merchantVerified.value = true
+  } catch {
+    merchantVerified.value = false
+  }
+})
+
 // 全局点击 → 关闭搜索下拉
 document.addEventListener('mousedown', onClickOutside)
 onUnmounted(() => {
@@ -391,7 +402,10 @@ async function onLoad() {
       pageSize,
     })
     const page = res || {}
-    const records = page.records || []
+    let records = page.records || []
+
+    // 过滤已打烊商家的商品（shopStatus: 0=打烊, 其他值=营业中或无商家）
+    records = records.filter(r => r.shopStatus === undefined || r.shopStatus === null || String(r.shopStatus) !== '0')
 
     // 批量获取每个 SPU 下 SKU 的最低价格
     if (records.length > 0) {

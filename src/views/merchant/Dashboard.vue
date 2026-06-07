@@ -3,14 +3,21 @@
     <NavBar title="我的店铺" />
 
     <!-- ==================== 🏪 店铺信息头部 ==================== -->
-    <div v-if="shopInfo" class="shop-header" @click="openShopDetail">
-      <div class="shop-avatar">
-        <van-image width="64" height="64" :src="shopInfo.shopLogo || defaultLogo" class="shop-logo-img" />
+    <div v-if="shopInfo" class="shop-header">
+      <div class="shop-header-main" @click="openShopDetail">
+        <div class="shop-avatar">
+          <van-image width="64" height="64" :src="shopInfo.shopLogo || defaultLogo" class="shop-logo-img" />
+        </div>
+        <div class="shop-meta">
+          <div class="shop-name">{{ shopInfo.shopName }}</div>
+          <div class="shop-contact">{{ shopInfo.contactName }} | {{ shopInfo.contactPhone }}</div>
+          <div class="shop-scope">{{ shopInfo.businessScope || '未设置经营范围' }}</div>
+        </div>
       </div>
-      <div class="shop-meta">
-        <div class="shop-name">{{ shopInfo.shopName }}</div>
-        <div class="shop-contact">{{ shopInfo.contactName }} | {{ shopInfo.contactPhone }}</div>
-        <div class="shop-scope">{{ shopInfo.businessScope || '未设置经营范围' }}</div>
+      <div class="shop-status-row">
+        <span class="shop-status-label">营业状态</span>
+        <van-switch v-model="shopInfo.shopStatus" :active-value="1" :inactive-value="0" size="20" @change="handleShopStatusChange" />
+        <span class="shop-status-text" :class="shopInfo.shopStatus === 1 ? 'on' : 'off'">{{ shopInfo.shopStatus === 1 ? '营业中' : '已打烊' }}</span>
       </div>
     </div>
     <van-loading v-else-if="shopLoading" class="loading-center" size="24" />
@@ -148,12 +155,19 @@
         <div class="list-items">
           <div v-for="item in orderList" :key="item.id" class="list-item order-item">
             <div class="order-info">
-              <div class="order-top">
-                <span class="order-id">订单 #{{ item.id }}</span>
-                <span class="order-status" :class="'status-' + item.status">{{ orderStatusText(item.status) }}</span>
+              <div class="order-product">
+                <span class="order-product-name">{{ item.items?.[0]?.spuName || '未知商品' }}</span>
+                <span v-if="item.items?.[0]?.skuName" class="order-product-sku">{{ item.items[0].skuName }}</span>
+                <span class="order-product-qty">×{{ item.items?.[0]?.quantity || 0 }}</span>
+                <span v-if="(item.items?.length || 0) > 1" class="order-product-more">等{{ item.items.length }}件商品</span>
               </div>
-              <div class="order-amount">¥{{ item.totalAmount || '0.00' }}</div>
-              <div class="order-time">{{ item.createTime }}</div>
+              <div class="order-amount">¥{{ item.payAmount || item.totalAmount || '0.00' }}</div>
+              <div class="order-contact">{{ item.receiverName }} {{ item.receiverPhone }}</div>
+              <div class="order-address">{{ item.receiverAddress }}</div>
+              <div class="order-bottom">
+                <span class="order-time">{{ item.createTime }}</span>
+                <span class="order-status" :class="'status-' + item.status">{{ item.statusText || orderStatusText(item.status) }}</span>
+              </div>
             </div>
             <div class="order-actions">
               <van-button size="mini" round plain class="action-btn" @click="viewOrder(item)">详情</van-button>
@@ -165,15 +179,36 @@
       </van-list>
 
       <!-- 订单详情弹窗 -->
-      <van-dialog v-model:show="showOrderDetail" title="订单详情" :show-confirm-button="false" closeable close-icon-position="top-left">
+      <van-dialog v-model:show="showOrderDetail" title="订单详情" :show-confirm-button="false" closeable close-icon-position="top-left" class="order-detail-dialog">
         <div class="dialog-body">
-          <div class="detail-row"><span class="detail-lbl">订单号</span><span class="detail-val">{{ orderDetail.id }}</span></div>
-          <div class="detail-row"><span class="detail-lbl">状态</span><span class="detail-val">{{ orderStatusText(orderDetail.status) }}</span></div>
+          <div class="detail-row"><span class="detail-lbl">订单编号</span><span class="detail-val">{{ orderDetail.orderNo || orderDetail.id }}</span></div>
+          <div class="detail-row"><span class="detail-lbl">订单状态</span><span class="detail-val"><span class="order-status-text" :class="'s-' + orderDetail.status">{{ orderDetail.statusText || orderStatusText(orderDetail.status) }}</span></span></div>
           <div class="detail-row"><span class="detail-lbl">收货人</span><span class="detail-val">{{ orderDetail.receiverName }}</span></div>
           <div class="detail-row"><span class="detail-lbl">联系电话</span><span class="detail-val">{{ orderDetail.receiverPhone }}</span></div>
           <div class="detail-row"><span class="detail-lbl">收货地址</span><span class="detail-val">{{ orderDetail.receiverAddress }}</span></div>
-          <div class="detail-row"><span class="detail-lbl">实付金额</span><span class="detail-val price">¥{{ orderDetail.totalAmount || '0.00' }}</span></div>
+          <div v-if="orderDetail.remark" class="detail-row"><span class="detail-lbl">备注</span><span class="detail-val">{{ orderDetail.remark }}</span></div>
+          <div class="detail-divider"></div>
+          <div class="detail-row"><span class="detail-lbl">商品总额</span><span class="detail-val">¥{{ orderDetail.totalAmount || '0.00' }}</span></div>
+          <div class="detail-row"><span class="detail-lbl">实付金额</span><span class="detail-val price">¥{{ orderDetail.payAmount || orderDetail.totalAmount || '0.00' }}</span></div>
           <div class="detail-row"><span class="detail-lbl">下单时间</span><span class="detail-val">{{ orderDetail.createTime }}</span></div>
+          <div v-if="orderDetail.payTime" class="detail-row"><span class="detail-lbl">付款时间</span><span class="detail-val">{{ orderDetail.payTime }}</span></div>
+          <div v-if="orderDetail.deliveryTime" class="detail-row"><span class="detail-lbl">发货时间</span><span class="detail-val">{{ orderDetail.deliveryTime }}</span></div>
+
+          <!-- 商品列表 -->
+          <div v-if="orderDetail.items?.length" class="detail-goods-section">
+            <div class="detail-goods-title">商品信息</div>
+            <div v-for="item in orderDetail.items" :key="item.id" class="detail-goods-item">
+              <van-image width="56" height="56" fit="cover" :src="item.image" class="goods-thumb" />
+              <div class="goods-detail">
+                <div class="goods-name">{{ item.spuName }}</div>
+                <div class="goods-sku">{{ item.skuName }}</div>
+                <div class="goods-price-qty">
+                  <span class="goods-price">¥{{ item.price }}</span>
+                  <span class="goods-qty">×{{ item.quantity }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </van-dialog>
 
@@ -215,54 +250,116 @@
     <!-- ==================== Tab 数据评价 ==================== -->
     <div v-show="activeTab === 'data'" class="tab-content">
       <!-- 营收概览 -->
-      <div class="data-cards">
-        <div class="data-card">
-          <div class="data-num">¥{{ stats.totalRevenue || '0.00' }}</div>
-          <div class="data-lbl">总营收</div>
+      <div class="revenue-cards">
+        <div class="revenue-card">
+          <div class="revenue-num">¥{{ stats.totalAmount ?? '0.00' }}</div>
+          <div class="revenue-lbl">总营收</div>
         </div>
-        <div class="data-card">
-          <div class="data-num">{{ stats.orderCount || 0 }}</div>
-          <div class="data-lbl">订单总数</div>
+        <div class="revenue-card">
+          <div class="revenue-num">¥{{ stats.monthAmount ?? '0.00' }}</div>
+          <div class="revenue-lbl">本月营收</div>
         </div>
-        <div class="data-card">
-          <div class="data-num">¥{{ stats.avgAmount || '0.00' }}</div>
-          <div class="data-lbl">客单价</div>
+        <div class="revenue-card">
+          <div class="revenue-num">{{ stats.totalOrderCount ?? 0 }}</div>
+          <div class="revenue-lbl">总订单</div>
+        </div>
+      </div>
+      <!-- DSR 评分概览 -->
+      <div class="dsr-section">
+        <div class="dsr-cards">
+          <div class="dsr-card">
+            <div class="dsr-score">{{ dsr.describeScore ?? '--' }}</div>
+            <div class="dsr-label">描述相符</div>
+            <div class="dsr-bar-wrap"><div class="dsr-bar" :style="{ width: dsrBarWidth(dsr.describeScore) }"></div></div>
+          </div>
+          <div class="dsr-card">
+            <div class="dsr-score">{{ dsr.serviceScore ?? '--' }}</div>
+            <div class="dsr-label">服务态度</div>
+            <div class="dsr-bar-wrap"><div class="dsr-bar service" :style="{ width: dsrBarWidth(dsr.serviceScore) }"></div></div>
+          </div>
+          <div class="dsr-card">
+            <div class="dsr-score">{{ dsr.logisticsScore ?? '--' }}</div>
+            <div class="dsr-label">物流服务</div>
+            <div class="dsr-bar-wrap"><div class="dsr-bar logistics" :style="{ width: dsrBarWidth(dsr.logisticsScore) }"></div></div>
+          </div>
+        </div>
+        <div class="dsr-footer">近90天有效评价 {{ dsr.totalCount || 0 }} 条 · 本月新增 {{ dsr.monthCount || 0 }} 条</div>
+      </div>
+
+      <!-- DSR 近30天趋势 -->
+      <div class="chart-section">
+        <div class="section-title">DSR 近30天趋势</div>
+        <div class="chart-wrap">
+          <svg :viewBox="`0 0 ${svgW} ${svgH}`" class="dsr-svg" v-if="dsrTrend.length > 0">
+            <!-- Y 轴网格线 -->
+            <line v-for="y in svgGridY" :key="y" :x1="padL" :y1="y" :x2="svgW - padR" :y2="y" stroke="#f0ece8" stroke-width="1" />
+            <!-- 三条折线 -->
+            <polyline :points="svgLine('describeScore')" fill="none" stroke="#e8573a" stroke-width="2" stroke-linejoin="round" />
+            <polyline :points="svgLine('serviceScore')" fill="none" stroke="#1989fa" stroke-width="2" stroke-linejoin="round" />
+            <polyline :points="svgLine('logisticsScore')" fill="none" stroke="#07c160" stroke-width="2" stroke-linejoin="round" />
+            <!-- X 轴日期（首+尾） -->
+            <text :x="padL" :y="svgH - 4" font-size="10" fill="#c8c4c0">{{ dsrTrend[0]?.statDate?.slice(5) || '' }}</text>
+            <text :x="svgW - padR" :y="svgH - 4" font-size="10" fill="#c8c4c0" text-anchor="end">{{ dsrTrend[dsrTrend.length - 1]?.statDate?.slice(5) || '' }}</text>
+          </svg>
+          <van-empty v-else description="暂无趋势数据" />
+        </div>
+        <div class="high-rate">
+          <span class="rate-item"><span class="dot describe"></span>描述 {{ dsrHighRate('describeHighRate') }}</span>
+          <span class="rate-item"><span class="dot service"></span>服务 {{ dsrHighRate('serviceHighRate') }}</span>
+          <span class="rate-item"><span class="dot logistics"></span>物流 {{ dsrHighRate('logisticsHighRate') }}</span>
         </div>
       </div>
 
       <!-- 评价列表 -->
       <div class="review-section">
-        <div class="section-title">最新评价</div>
-        <van-list v-model:loading="reviewLoading" :finished="reviewFinished" finished-text="没有更多了" @load="fetchReviews">
-          <div class="review-list">
-            <div v-for="item in reviewList" :key="item.id" class="review-item">
-              <div class="review-top">
-                <span class="review-user">{{ item.memberName || '匿名用户' }}</span>
-                <span class="review-stars">
-                  <van-icon v-for="s in 5" :key="s" :name="s <= item.rating ? 'star' : 'star-o'" size="14" :color="s <= item.rating ? '#f39c12' : '#e0dcd8'" />
-                </span>
-              </div>
-              <div class="review-content">{{ item.content }}</div>
-              <div class="review-meta">
-                <span class="review-product">{{ item.productName }}</span>
+        <div class="section-title">店铺评价</div>
+        <div class="review-filter">
+          <span class="filter-btn" :class="{ active: reviewRating === 0 }" @click="filterReviews(0)">全部</span>
+          <span class="filter-btn" :class="{ active: reviewRating === 1 }" @click="filterReviews(1)">好评</span>
+          <span class="filter-btn" :class="{ active: reviewRating === 2 }" @click="filterReviews(2)">中评</span>
+          <span class="filter-btn" :class="{ active: reviewRating === 3 }" @click="filterReviews(3)">差评</span>
+        </div>
+        <div class="review-list">
+          <div v-for="item in filteredReviews" :key="item.id" class="review-item">
+            <div class="review-user-row">
+              <van-image v-if="item.avatar" round width="32" height="32" :src="item.avatar" class="review-avatar" />
+              <div v-else class="review-avatar-placeholder"><van-icon name="user-o" size="16" color="#c8c4c0" /></div>
+              <div class="review-user-info">
+                <span class="review-username">{{ item.memberName || item.username || '匿名用户' }}</span>
                 <span class="review-time">{{ item.createTime }}</span>
               </div>
+              <span class="review-stars">
+                <van-icon v-for="s in 5" :key="s" :name="s <= item.rating ? 'star' : 'star-o'" size="13" :color="s <= item.rating ? '#f39c12' : '#e0dcd8'" />
+              </span>
+            </div>
+            <div class="review-content">{{ item.content }}</div>
+            <div v-if="item.imageList?.length" class="review-images">
+              <van-image v-for="(img, i) in item.imageList" :key="i" width="64" height="64" fit="cover" :src="img" class="review-img" />
             </div>
           </div>
-          <van-empty v-if="!reviewLoading && reviewList.length === 0" description="暂无评价" />
-        </van-list>
+        </div>
+        <van-empty v-if="!reviewLoading && filteredReviews.length === 0" description="暂无评价" />
+        <van-pagination
+          v-if="reviewTotal > 0"
+          v-model="reviewPage"
+          :total-items="reviewTotal"
+          :items-per-page="10"
+          @change="fetchReviews"
+          mode="simple"
+          class="review-pagination"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, watch, onActivated, onMounted } from 'vue'
+import { ref, reactive, watch, computed, onActivated, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import NavBar from '../../components/NavBar.vue'
 import GoodsForm from '../../components/goods/GoodsForm.vue'
-import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage } from '../../api/merchant.js'
+import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage, getDsrTrend, updateShopStatus } from '../../api/merchant.js'
 import { getSpuDetail, toggleSpuStatus } from '../../api/goods.js'
 import { getOrderDetail, deliverOrder } from '../../api/order.js'
 import { getTree } from '../../api/category.js'
@@ -380,19 +477,53 @@ const editGoodsData = ref({})
 const editGoodsId = ref(null)
 const editGoodsFormRef = ref(null)
 
+/** API 返回的全量商品列表（用于前端分类过滤） */
+const allGoodsCache = ref([])
+const allGoodsTotal = ref(0)
+
+/** 根据 selectedCategoryId 前端过滤后的列表 */
+const filteredGoods = computed(() => {
+  let list = allGoodsCache.value
+  if (goodsCategoryId.value) {
+    list = list.filter(item => String(item.categoryId) === String(goodsCategoryId.value))
+  }
+  return list
+})
+
+/** 当前页展示的数据（前端分页） */
+const displayGoods = computed(() => {
+  const start = (goodsPage.value - 1) * 10
+  return filteredGoods.value.slice(start, start + 10)
+})
+
+watch(filteredGoods, (list) => {
+  goodsTotal.value = list.length
+  // 如果当前页超出范围，回到第1页
+  const maxPage = Math.max(1, Math.ceil(list.length / 10))
+  if (goodsPage.value > maxPage) goodsPage.value = maxPage
+}, { immediate: true })
+
 async function fetchGoods() {
   goodsLoading.value = true
   try {
-    const params = { pageNum: goodsPage.value, pageSize: 10 }
+    const params = { pageNum: 1, pageSize: 999 }  // 一次拉取足够多，前端做分类过滤
     if (goodsKeyword.value) params.keyword = goodsKeyword.value
-    if (goodsCategoryId.value) params.categoryId = goodsCategoryId.value
     const res = await getMerchantGoodsPage(params)
-    goodsList.value = res?.records || []
-    goodsTotal.value = res?.total || 0
-    goodsFinished.value = goodsList.value.length < 10
-  } catch { goodsFinished.value = true }
+    allGoodsCache.value = res?.records || []
+    allGoodsTotal.value = res?.total || 0
+    goodsTotal.value = filteredGoods.value.length
+    goodsPage.value = 1
+    goodsFinished.value = true
+    // 同步到 goodsList 供模板渲染
+    goodsList.value = displayGoods.value
+  } catch { goodsFinished.value = true; goodsList.value = [] }
   finally { goodsLoading.value = false }
 }
+
+/* 监听分类或关键词变化，保持 goodsList 同步 */
+watch(displayGoods, (list) => {
+  goodsList.value = list
+}, { immediate: true })
 
 function handleSearch() {
   goodsPage.value = 1
@@ -406,7 +537,8 @@ function clearSearch() {
 }
 
 function onGoodsPageChange() {
-  fetchGoods()
+  // 前端分页，直接从 computed 同步
+  goodsList.value = displayGoods.value
 }
 
 const flatCategories = ref([])
@@ -416,7 +548,7 @@ function selectGoodsCategory(id, name) {
   goodsCategoryName.value = name
   showGoodsCategory.value = false
   goodsPage.value = 1
-  fetchGoods()
+  // 前端过滤自动生效，不需要重新请求 API
 }
 
 function openAddGoods() {
@@ -530,27 +662,95 @@ async function confirmDeliver() {
 }
 
 // ═══════════════ 数据评价 ═══════════════
-const stats = ref({ totalRevenue: 0, orderCount: 0, avgAmount: 0 })
+const stats = ref({ totalAmount: 0, monthAmount: 0, totalOrderCount: 0 })
+const dsr = ref({})
+const dsrTrend = ref([])
 const reviewList = ref([])
 const reviewLoading = ref(false)
-const reviewFinished = ref(false)
 const reviewPage = ref(1)
+const reviewTotal = ref(0)
+const reviewRating = ref(0)
 
-async function fetchStats() {
+// SVG 图表常量
+const padL = 30, padR = 10, padT = 8, padB = 18
+const svgW = 340, svgH = 120
+const chartW = svgW - padL - padR
+const chartH = svgH - padT - padB
+const svgGridY = [padT, padT + chartH / 2, padT + chartH]
+
+function dsrBarWidth(score) {
+  if (!score && score !== 0) return '0%'
+  return Math.min(100, Math.round((score / 5) * 100)) + '%'
+}
+
+function dsrHighRate(key) {
+  const v = dsr.value[key]
+  return v != null ? `${(v * 100).toFixed(0)}%` : '--'
+}
+
+function svgLine(field) {
+  const trend = dsrTrend.value
+  if (!trend?.length) return ''
+  const minScore = 4.0, maxScore = 5.0
+  return trend.map((d, i) => {
+    const x = padL + (i / Math.max(trend.length - 1, 1)) * chartW
+    const val = d[field] ?? minScore
+    const y = padT + chartH - ((val - minScore) / (maxScore - minScore)) * chartH
+    return `${x},${y}`
+  }).join(' ')
+}
+
+function scoreClass(s) {
+  if (!s) return ''
+  if (s >= 4) return 'score-high'
+  if (s >= 3) return 'score-mid'
+  return 'score-low'
+}
+
+async function fetchDsr() {
   try {
-    stats.value = await getShopStats()
+    const data = await getDsrTrend()
+    dsr.value = data
+    dsrTrend.value = data?.trend || []
   } catch { /* silent */ }
 }
 
+const filteredReviews = computed(() => {
+  const r = reviewRating.value
+  if (r === 0) return reviewList.value
+  return reviewList.value.filter(item => {
+    if (r === 1) return item.rating >= 4  // 好评
+    if (r === 2) return item.rating === 3  // 中评
+    if (r === 3) return item.rating <= 2  // 差评
+    return true
+  })
+})
+
 async function fetchReviews() {
+  reviewLoading.value = true
   try {
     const res = await getShopReviews({ pageNum: reviewPage.value, pageSize: 10 })
-    const records = res?.records || []
-    reviewList.value.push(...records)
-    reviewPage.value++
-    if (records.length < 10) reviewFinished.value = true
-  } catch { reviewFinished.value = true }
+    reviewList.value = res?.records || []
+    reviewTotal.value = res?.total || 0
+  } catch { reviewList.value = [] }
   finally { reviewLoading.value = false }
+}
+
+function filterReviews(rating) {
+  reviewRating.value = rating
+  reviewPage.value = 1
+  fetchReviews()
+}
+
+async function handleShopStatusChange() {
+  try {
+    const newStatus = await updateShopStatus()
+    shopInfo.value.shopStatus = newStatus
+    showToast(newStatus === 1 ? '已营业' : '已打烊')
+  } catch {
+    // 还原开关状态
+    shopInfo.value.shopStatus = shopInfo.value.shopStatus === 1 ? 0 : 1
+  }
 }
 
 // ── Tab 切换懒加载 ──
@@ -561,13 +761,19 @@ watch(activeTab, (tab) => {
   if (tab === 'orders' && orderList.value.length === 0) {
     orderList.value = []; orderPage.value = 1; orderFinished.value = false; orderLoading.value = true; fetchOrders()
   }
-  if (tab === 'data' && reviewList.value.length === 0) {
-    fetchStats()
-    reviewList.value = []; reviewPage.value = 1; reviewFinished.value = false; reviewLoading.value = true; fetchReviews()
+  if (tab === 'data') {
+    fetchDsr()
+    getShopStats().then(data => { stats.value = data }).catch(() => {})
+    if (reviewList.value.length === 0) {
+      reviewPage.value = 1; fetchReviews()
+    }
   }
 })
 
-onActivated(() => { fetchShop() })
+onActivated(() => {
+  fetchShop()
+  if (activeTab.value === 'goods' && goodsList.value.length === 0) fetchGoods()
+})
 </script>
 
 <style scoped>
@@ -774,18 +980,22 @@ onActivated(() => { fetchShop() })
 }
 
 /* ── 订单管理 ── */
-.order-item { display: flex; align-items: center; padding: 14px 12px; }
+.order-item { display: flex; align-items: center; padding: 12px; }
 .order-info { flex: 1; min-width: 0; }
-.order-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.order-id { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+.order-product { margin-bottom: 4px; }
+.order-product-name { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+.order-product-sku { font-size: 12px; color: #9a9aae; margin-left: 6px; }
+.order-amount { font-size: 15px; font-weight: 700; color: #e8573a; margin-bottom: 4px; }
+.order-contact { font-size: 12px; color: #5a5a6e; margin-bottom: 2px; }
+.order-address { font-size: 12px; color: #9a9aae; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-bottom { display: flex; align-items: center; justify-content: space-between; }
+.order-time { font-size: 11px; color: #c8c4c0; }
 .order-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
 .status-0 { background: #fff3e0; color: #f39c12; }
 .status-1 { background: #e8f8ee; color: #07c160; }
 .status-2 { background: #e3f2fd; color: #1989fa; }
 .status-3 { background: #f5f3f0; color: #9a9aae; }
 .status-4 { background: #f5f3f0; color: #c8c4c0; }
-.order-amount { font-size: 16px; font-weight: 700; color: #e8573a; }
-.order-time { font-size: 11px; color: #c8c4c0; margin-top: 2px; }
 .order-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
 .action-btn { height: 28px; font-size: 12px; padding: 0 12px; }
 .action-btn.primary { background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important; border: none !important; color: #fff !important; }
@@ -796,24 +1006,93 @@ onActivated(() => { fetchShop() })
 .detail-lbl { width: 70px; font-size: 13px; color: #9a9aae; flex-shrink: 0; }
 .detail-val { flex: 1; font-size: 13px; color: #1a1a2e; word-break: break-all; }
 .detail-val.price { font-weight: 700; color: #e8573a; }
+.detail-divider { height: 1px; background: #f0ece8; margin: 8px 0; width: 100%; }
+.detail-goods-section { width: 100%; margin-top: 12px; }
+.detail-goods-title { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 10px; }
+.detail-goods-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f3f0; }
+.detail-goods-item:last-child { border-bottom: none; }
+.goods-thumb { border-radius: 6px; flex-shrink: 0; }
+.goods-detail { flex: 1; min-width: 0; }
+.goods-name { font-size: 13px; font-weight: 500; color: #1a1a2e; margin-bottom: 2px; }
+.goods-sku { font-size: 12px; color: #9a9aae; margin-bottom: 4px; }
+.goods-price-qty { display: flex; align-items: center; gap: 6px; }
+.goods-price { font-size: 14px; font-weight: 700; color: #e8573a; }
+.goods-qty { font-size: 12px; color: #c8c4c0; }
+.order-status-text { font-size: 12px; padding: 2px 10px; border-radius: 10px; font-weight: 500; }
+.order-status-text.s--1 { background: #f5f3f0; color: #9a9aae; }
+.order-status-text.s-0 { background: #fff3e0; color: #f39c12; }
+.order-status-text.s-1 { background: #e8f8ee; color: #07c160; }
+.order-status-text.s-2 { background: #e3f2fd; color: #1989fa; }
+.order-status-text.s-3 { background: #f5f3f0; color: #9a9aae; }
+.order-status-text.s-4 { background: #f5f3f0; color: #c8c4c0; }
+:deep(.order-detail-dialog) { width: 90% !important; }
+:deep(.order-detail-dialog .van-dialog__content) { max-height: 80vh; overflow-y: auto; }
 
-/* ── 数据评价 ── */
-.data-cards { display: flex; gap: 10px; margin-bottom: 16px; }
-.data-card { flex: 1; background: #fff; border-radius: 12px; padding: 16px 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-.data-num { font-size: 18px; font-weight: 700; color: #e8573a; }
-.data-lbl { font-size: 12px; color: #9a9aae; margin-top: 4px; }
+/* ── 店铺头部营业状态 ── */
+.shop-header-main { display: flex; align-items: center; gap: 14px; cursor: pointer; }
+.shop-status-row { display: flex; align-items: center; gap: 6px; padding: 8px 16px 4px; }
+.shop-status-label { font-size: 12px; opacity: 0.8; }
+.shop-status-text { font-size: 12px; font-weight: 600; }
+.shop-status-text.on { color: #4caf50; }
+.shop-status-text.off { color: rgba(255,255,255,0.6); }
+
+/* ── 营收概览 ── */
+.revenue-cards { display: flex; gap: 8px; margin-bottom: 10px; }
+.revenue-card { flex: 1; background: #fff; border-radius: 12px; padding: 14px 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.revenue-num { font-size: 17px; font-weight: 700; color: #e8573a; }
+.revenue-lbl { font-size: 11px; color: #9a9aae; margin-top: 4px; }
+
+/* ── DSR 评分概览 ── */
+.dsr-section { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.dsr-cards { display: flex; gap: 8px; }
+.dsr-card { flex: 1; text-align: center; }
+.dsr-score { font-size: 20px; font-weight: 700; color: #1a1a2e; line-height: 1.2; }
+.dsr-label { font-size: 11px; color: #9a9aae; margin: 2px 0 4px; }
+.dsr-bar-wrap { height: 3px; background: #f0ece8; border-radius: 2px; overflow: hidden; }
+.dsr-bar { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #e8573a, #f39c12); transition: width 0.4s; }
+.dsr-bar.service { background: linear-gradient(90deg, #1989fa, #5cadff); }
+.dsr-bar.logistics { background: linear-gradient(90deg, #07c160, #4cd964); }
+.dsr-footer { text-align: center; font-size: 11px; color: #c8c4c0; margin-top: 6px; }
+
+/* ── DSR 趋势图 ── */
+.chart-section { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.chart-wrap { margin: 4px 0; }
+.dsr-svg { width: 100%; height: auto; }
+.section-title { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
+.high-rate { display: flex; justify-content: center; gap: 16px; padding-top: 6px; border-top: 1px solid #f5f3f0; }
+.rate-item { font-size: 11px; color: #5a5a6e; display: flex; align-items: center; gap: 4px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.describe { background: #e8573a; }
+.dot.service { background: #1989fa; }
+.dot.logistics { background: #07c160; }
+
+/* ── 评价列表 ── */
 .review-section { }
-.section-title { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 10px; }
+.review-filter { display: flex; gap: 8px; margin-bottom: 10px; }
+.filter-btn {
+  font-size: 12px; padding: 4px 14px; border-radius: 14px; background: #f0ece8; color: #5a5a6e; cursor: pointer; transition: all 0.2s;
+}
+.filter-btn.active { background: #e8573a; color: #fff; font-weight: 500; }
 .review-list { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-.review-item { padding: 14px 16px; border-bottom: 1px solid #f0ece8; }
+.review-item { padding: 12px 14px; border-bottom: 1px solid #f0ece8; }
 .review-item:last-child { border-bottom: none; }
-.review-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.review-user { font-size: 13px; font-weight: 600; color: #1a1a2e; }
-.review-stars { display: flex; gap: 2px; }
-.review-content { font-size: 13px; color: #5a5a6e; line-height: 1.5; margin-bottom: 6px; }
-.review-meta { display: flex; align-items: center; justify-content: space-between; }
-.review-product { font-size: 11px; color: #9a9aae; }
+.review-user-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.review-avatar { flex-shrink: 0; }
+.review-avatar-placeholder { width: 32px; height: 32px; border-radius: 50%; background: #f5f3f0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.review-user-info { flex: 1; min-width: 0; }
+.review-username { display: block; font-size: 13px; font-weight: 600; color: #1a1a2e; }
 .review-time { font-size: 11px; color: #c8c4c0; }
+.review-stars { display: flex; gap: 2px; flex-shrink: 0; }
+.review-score-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.review-score-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f5f3f0; color: #9a9aae; }
+.review-score-tag.score-high { background: #e8f8ee; color: #07c160; }
+.review-score-tag.score-mid { background: #fff3e0; color: #f39c12; }
+.review-score-tag.score-low { background: #fde8e5; color: #e8573a; }
+.review-content { font-size: 13px; color: #5a5a6e; line-height: 1.4; margin-bottom: 6px; }
+.review-images { display: flex; gap: 6px; flex-wrap: wrap; }
+.review-img { border-radius: 6px; border: 1px solid #f0ece8; }
+.review-pagination { margin-top: 12px; }
+
 .company-list { padding: 8px 16px 24px; max-height: 50vh; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 10px; }
 .company-item { flex: 0 0 calc(33.33% - 7px); padding: 10px 0; text-align: center; font-size: 14px; color: #1a1a2e; background: #f5f3f0; border-radius: 8px; cursor: pointer; }
 .company-item:active { background: #e0dcd8; }
