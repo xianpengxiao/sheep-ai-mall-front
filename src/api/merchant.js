@@ -77,3 +77,18 @@ export function getMerchantInfo(id) {
 export function updateShopStatus() {
   return request.put('/merchant/shop/status')
 }
+
+/** 商家商品上下架 */
+export function toggleMerchantGoodsStatus(id, status) {
+  return request.put(`/merchant/goods/${id}/status`, null, { params: { status } })
+}
+
+/** AI 生成营销文案 */
+export function generateProductCopy(data) {
+  return request.post('/ai/product-copy', data)
+}
+
+/** 保存 AI 文案 */
+export function saveProductCopy(data) {
+  return request.post('/ai/product-copy/save', data)
+}

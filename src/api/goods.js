@@ -35,6 +35,11 @@ export function updateSpu(id, data) {
   return request.put(`/spu/${id}`, data)
 }
 
+/** 删除 SPU */
+export function deleteSpu(id) {
+  return request.delete(`/spu/${id}`)
+}
+
 /** 上架/下架 SPU（1=上架 0=下架） */
 export function toggleSpuStatus(id, status) {
   return request.put(`/spu/${id}/status/${status}`)

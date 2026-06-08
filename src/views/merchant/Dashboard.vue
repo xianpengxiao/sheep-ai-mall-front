@@ -76,61 +76,115 @@
     </van-tabs>
 
     <div v-show="activeTab === 'goods'" class="tab-content">
-      <div class="toolbar">
-        <div class="search-bar">
-          <van-icon name="search" size="16" color="#9a9aae" />
-          <input v-model="goodsKeyword" class="search-input" placeholder="搜索商品名称..." @keyup.enter="handleSearch" />
-          <van-icon v-if="goodsKeyword" name="close" size="14" color="#c8c4c0" class="search-clear" @click.stop="clearSearch" />
+      <div class="goods-layout">
+        <!-- 左栏：分类列表（sticky 固定，不随页面滚动） -->
+        <div class="goods-sidebar">
+          <div class="sidebar-title">商品分类</div>
+          <div
+            class="sidebar-cat"
+            :class="{ active: !goodsCategoryId }"
+            @click="selectGoodsCategory(null)"
+          >全部分类</div>
+          <div
+            v-for="cat in flatCategories"
+            :key="cat.value"
+            class="sidebar-cat"
+            :class="{ active: goodsCategoryId === cat.value }"
+            @click="selectGoodsCategory(cat.value)"
+          >{{ cat.text }}</div>
         </div>
-        <van-button plain round size="small" class="toolbar-btn-cat" @click="showGoodsCategory = true">
-          {{ goodsCategoryName || '全部分类' }}
-          <van-icon name="arrow-down" size="12" />
-        </van-button>
-        <van-button round size="small" class="toolbar-btn" @click="openAddGoods">
-          <van-icon name="plus" size="14" /> 新增商品
-        </van-button>
-      </div>
-      <van-action-sheet v-model:show="showGoodsCategory" title="选择分类" @cancel="showGoodsCategory = false">
-        <div class="category-sheet-list">
-          <div class="category-sheet-item" :class="{ active: !goodsCategoryId }" @click="selectGoodsCategory(null, '全部分类')">全部分类</div>
-          <div v-for="cat in flatCategories" :key="cat.value" class="category-sheet-item" :class="{ active: goodsCategoryId === cat.value }" @click="selectGoodsCategory(cat.value, cat.text.trim())">{{ cat.text }}</div>
-        </div>
-      </van-action-sheet>
 
-      <div v-if="goodsList.length > 0" class="list-items">
-        <div v-for="item in goodsList" :key="item.id" class="list-item">
-          <van-image width="64" height="64" fit="cover" :src="item.mainImage || defaultImg" class="item-img" />
-          <div class="item-info">
-            <div class="item-name">{{ item.name }}</div>
-            <div class="item-meta">
-              <span class="item-price">¥{{ item.minPrice || '0.00' }}</span>
-              <span class="item-tag" :class="item.status === 1 ? 'tag-on' : 'tag-off'">
-                {{ item.status === 1 ? '上架' : '下架' }}
-              </span>
+        <!-- 右栏：搜索 + 商品列表 -->
+        <div class="goods-main">
+          <div class="toolbar-sticky"><div class="toolbar">
+            <div class="search-bar">
+              <van-icon name="search" size="16" color="#9a9aae" />
+              <input v-model="goodsKeyword" class="search-input" placeholder="搜索商品名称..." @keyup.enter="handleSearch" />
+              <van-icon v-if="goodsKeyword" name="close" size="14" color="#c8c4c0" class="search-clear" @click.stop="clearSearch" />
+            </div>
+            <van-button round size="small" class="toolbar-btn" @click="openAddGoods">
+              <van-icon name="plus" size="14" /> 新增商品
+            </van-button>
+          </div></div>
+
+          <div v-if="goodsList.length > 0" class="goods-card-list">
+            <div v-for="item in goodsList" :key="item.id" class="goods-card">
+              <!-- 左：商品主图 -->
+              <div class="card-img-wrap" @click="goGoodsDetail(item.id)">
+                <van-image width="88" height="88" fit="cover" :src="item.mainImage || defaultImg" class="card-img" />
+              </div>
+
+              <!-- 中：核心信息 -->
+              <div class="card-info">
+                <div class="card-name" @click="goGoodsDetail(item.id)">{{ item.name }}</div>
+                <div class="card-subtitle" v-if="item.subTitle" @click="goGoodsDetail(item.id)">{{ item.subTitle }}</div>
+                <div class="card-brand-row">
+                  <span class="card-brand">{{ item.brand || '未知品牌' }}</span>
+                  <span class="card-tag" :class="item.status === 1 ? 'tag-on' : 'tag-off'">{{ item.status === 1 ? '上架' : '下架' }}</span>
+                </div>
+                <div class="card-price">¥{{ item.minPrice ?? '0.00' }}</div>
+
+                <!-- 库存信息区（悬浮展示 SKU 明细） -->
+                <div class="card-stock-row">
+                  <div class="stock-info-trigger">
+                    <div class="stock-info-bar">
+                      <span class="stock-num">库存 {{ item.totalStock ?? '--' }}</span>
+                      <span class="stock-status-dot" :class="stockStatusClass(item.stockStatus)"></span>
+                      <span class="stock-status-text">{{ stockStatusText(item.stockStatus) }}</span>
+                      <span v-if="item.multiSpec" class="badge-multi">多规格</span>
+                      <span v-if="item.partOutOfStock" class="badge-part-oos">部分缺货</span>
+                      <van-icon name="info-o" size="14" color="#c8c4c0" class="stock-info-icon" />
+                    </div>
+                    <!-- SKU 库存悬浮弹窗 -->
+                    <div class="stock-tooltip">
+                      <div class="tooltip-title">SKU 库存明细</div>
+                      <div class="tooltip-table">
+                        <div class="tooltip-tr tooltip-th">
+                          <span class="tt-sku">规格</span>
+                          <span class="tt-price">单价</span>
+                          <span class="tt-stock">库存</span>
+                        </div>
+                        <div v-for="sku in (item.skuStockList || [])" :key="sku.skuId" class="tooltip-tr">
+                          <span class="tt-sku">{{ sku.skuName }}</span>
+                          <span class="tt-price">¥{{ sku.price }}</span>
+                          <span class="tt-stock">{{ sku.stock }}</span>
+                        </div>
+                        <div v-if="!item.skuStockList?.length" class="tooltip-empty">暂无 SKU 数据</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 右：操作按钮 -->
+              <div class="card-actions">
+                <div class="action-item" @click.stop="editGoods(item)"><van-icon name="edit" size="18" color="#5a5a6e" /><span>编辑</span></div>
+                <div class="action-item" @click.stop="handleToggle(item)">
+                  <van-icon :name="item.status === 1 ? 'eye-o' : 'closed-eye'" size="18" :color="item.status === 1 ? '#07c160' : '#c8c4c0'" />
+                  <span>{{ item.status === 1 ? '下架' : '上架' }}</span>
+                </div>
+                <div class="action-item" @click.stop="handleDeleteGoods(item)"><van-icon name="delete" size="18" color="#e8573a" /><span>删除</span></div>
+              </div>
             </div>
           </div>
-          <div class="item-actions">
-            <van-icon name="edit" size="18" color="#5a5a6e" @click="editGoods(item)" />
-            <van-icon
-              :name="item.status === 1 ? 'eye-o' : 'closed-eye'"
-              size="18"
-              :color="item.status === 1 ? '#07c160' : '#c8c4c0'"
-              @click="handleToggle(item)"
-            />
-          </div>
+          <van-empty v-if="!goodsLoading && goodsList.length === 0" description="暂无商品" />
+
+          <van-pagination
+            v-if="goodsTotal > 0"
+            v-model="goodsPage"
+            :total-items="goodsTotal"
+            :items-per-page="10"
+            @change="onGoodsPageChange"
+            mode="simple"
+            class="goods-pagination"
+          />
         </div>
       </div>
-      <van-empty v-if="!goodsLoading && goodsList.length === 0" description="暂无商品" />
 
-      <van-pagination
-        v-if="goodsTotal > 0"
-        v-model="goodsPage"
-        :total-items="goodsTotal"
-        :items-per-page="10"
-        @change="onGoodsPageChange"
-        mode="simple"
-        class="goods-pagination"
-      />
+      <!-- 新增商品弹窗 -->
+      <van-dialog v-model:show="showAddGoods" title="新增商品" :show-confirm-button="false" closeable close-icon-position="top-left" class="edit-goods-dialog">
+        <GoodsForm ref="addGoodsFormRef" :init-form="{}" submit-text="提交商品" @submit="handleAddGoods" />
+      </van-dialog>
 
       <!-- 编辑商品弹窗 -->
       <van-dialog v-model:show="showEditGoods" title="编辑商品" :show-confirm-button="false" closeable close-icon-position="top-left" class="edit-goods-dialog">
@@ -355,15 +409,14 @@
 
 <script setup>
 import { ref, reactive, watch, computed, onActivated, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
+import { useRouter } from 'vue-router'
 import NavBar from '../../components/NavBar.vue'
 import GoodsForm from '../../components/goods/GoodsForm.vue'
-import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage, getDsrTrend, updateShopStatus } from '../../api/merchant.js'
-import { getSpuDetail, toggleSpuStatus } from '../../api/goods.js'
+import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage, getDsrTrend, updateShopStatus, publishGoods, toggleMerchantGoodsStatus } from '../../api/merchant.js'
+import { getSpuDetail, deleteSpu } from '../../api/goods.js'
 import { getOrderDetail, deliverOrder } from '../../api/order.js'
 import { getTree } from '../../api/category.js'
-
 const router = useRouter()
 const defaultImg = 'https://img.yzcdn.cn/vant/ipad.jpeg'
 const defaultLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e8573a' rx='16'/%3E%3Ctext x='50' y='66' text-anchor='middle' font-size='44' fill='%23fff'%3E🏪%3C/text%3E%3C/svg%3E"
@@ -470,8 +523,6 @@ const goodsPage = ref(1)
 const goodsTotal = ref(0)
 const goodsKeyword = ref('')
 const goodsCategoryId = ref(null)
-const goodsCategoryName = ref('')
-const showGoodsCategory = ref(false)
 const showEditGoods = ref(false)
 const editGoodsData = ref({})
 const editGoodsId = ref(null)
@@ -543,16 +594,25 @@ function onGoodsPageChange() {
 
 const flatCategories = ref([])
 
-function selectGoodsCategory(id, name) {
+function selectGoodsCategory(id) {
   goodsCategoryId.value = id
-  goodsCategoryName.value = name
-  showGoodsCategory.value = false
   goodsPage.value = 1
   // 前端过滤自动生效，不需要重新请求 API
 }
 
+const showAddGoods = ref(false)
+const addGoodsFormRef = ref(null)
+
 function openAddGoods() {
-  router.push('/merchant/goods/publish')
+  addGoodsFormRef.value?.resetForm()
+  showAddGoods.value = true
+}
+
+async function handleAddGoods(payload) {
+  await publishGoods(payload)
+  showToast('发布成功')
+  showAddGoods.value = false
+  goodsPage.value = 1; goodsFinished.value = false; fetchGoods()
 }
 
 async function editGoods(item) {
@@ -578,10 +638,35 @@ async function handleToggle(item) {
   const newStatus = item.status === 1 ? 0 : 1
   try {
     await showConfirmDialog({ title: '提示', message: `确认${action}该商品？`, confirmButtonText: '确定', cancelButtonText: '取消' })
-    await toggleSpuStatus(item.id, newStatus)
+    await toggleMerchantGoodsStatus(item.id, newStatus)
     showToast(`${action}成功`)
     goodsPage.value = 1; goodsFinished.value = false; fetchGoods()
   } catch { /* cancel */ }
+}
+
+async function handleDeleteGoods(item) {
+  try {
+    await showConfirmDialog({ title: '提示', message: `确认删除商品「${item.name}」？删除后不可恢复。`, confirmButtonText: '删除', cancelButtonText: '取消' })
+    await deleteSpu(item.id)
+    showToast('删除成功')
+    goodsPage.value = 1; goodsFinished.value = false; fetchGoods()
+  } catch { /* cancel or error */ }
+}
+
+function goGoodsDetail(id) {
+  router.push('/goods/' + id)
+}
+
+function stockStatusText(status) {
+  const map = { 0: '售罄', 1: '正常', 2: '紧张' }
+  return map[status] ?? '--'
+}
+function stockStatusClass(status) {
+  const map = { 0: 'stock-oos', 1: 'stock-ok', 2: 'stock-low' }
+  return map[status] ?? ''
+}
+function handleStockManage(item) {
+  showToast('库存管理功能开发中')
 }
 
 // ═══════════════ 订单管理 ═══════════════
@@ -926,7 +1011,8 @@ onActivated(() => {
 
 /* ── 商品列表 ── */
 .list-items { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-.list-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid #f0ece8; }
+.list-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid #f0ece8; cursor: pointer; transition: background 0.15s; }
+.list-item:hover { background: #faf8f6; }
 .list-item:last-child { border-bottom: none; }
 .item-img { border-radius: 8px; flex-shrink: 0; }
 .item-info { flex: 1; min-width: 0; }
@@ -937,6 +1023,221 @@ onActivated(() => {
 .tag-on { background: #e8f8ee; color: #07c160; }
 .tag-off { background: #f5f3f0; color: #9a9aae; }
 .item-actions { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+
+/* ── 商品卡片样式 ── */
+.goods-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.goods-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s;
+}
+.goods-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+/* 左：主图 */
+.card-img-wrap {
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f5f3f0;
+  border: 1px solid #f0ece8;
+  cursor: pointer;
+}
+.card-img { border-radius: 10px; }
+
+/* 中：信息区 */
+.card-info {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+.card-subtitle {
+  font-size: 12px;
+  color: #9a9aae;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+.card-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.card-brand {
+  font-size: 12px;
+  color: #5a5a6e;
+}
+.card-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e8573a;
+  margin-bottom: 6px;
+}
+.card-tag {
+  font-size: 11px;
+  padding: 1px 10px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.tag-on { background: #e8f8ee; color: #07c160; }
+.tag-off { background: #f5f3f0; color: #9a9aae; }
+
+/* 库存行 */
+.card-stock-row {
+  margin-top: 2px;
+}
+.stock-info-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.stock-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #5a5a6e;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #faf8f6;
+  transition: background 0.15s;
+}
+.stock-info-bar:hover {
+  background: #f0ece8;
+}
+.stock-num { font-weight: 500; }
+.stock-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.stock-status-dot.stock-ok { background: #07c160; }
+.stock-status-dot.stock-low { background: #f39c12; }
+.stock-status-dot.stock-oos { background: #e8573a; }
+.stock-status-text { font-size: 11px; color: #9a9aae; }
+.stock-info-icon { margin-left: 2px; }
+
+/* 库存 Badge */
+.badge-multi, .badge-part-oos {
+  font-size: 10px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.badge-multi { background: #e3f2fd; color: #1989fa; }
+.badge-part-oos { background: #fff3e0; color: #f39c12; }
+
+/* SKU 库存悬浮弹窗 */
+.stock-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.14);
+  padding: 12px 14px;
+  min-width: 220px;
+  z-index: 20;
+  white-space: nowrap;
+}
+.stock-info-trigger:hover .stock-tooltip {
+  display: block;
+}
+.stock-info-trigger:hover .stock-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 20px;
+  width: 10px; height: 10px;
+  background: #fff;
+  transform: rotate(45deg);
+  box-shadow: 3px 3px 6px rgba(0,0,0,0.06);
+}
+.tooltip-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+}
+.tooltip-table {
+  font-size: 12px;
+}
+.tooltip-tr {
+  display: flex;
+  gap: 16px;
+  padding: 4px 0;
+  border-bottom: 1px solid #f5f3f0;
+}
+.tooltip-tr:last-child { border-bottom: none; }
+.tooltip-th {
+  font-weight: 600;
+  color: #9a9aae;
+  font-size: 11px;
+}
+.tt-sku { width: 70px; color: #1a1a2e; }
+.tt-price { width: 60px; text-align: right; color: #e8573a; }
+.tt-stock { width: 50px; text-align: right; color: #1a1a2e; }
+.tooltip-th .tt-sku,
+.tooltip-th .tt-price,
+.tooltip-th .tt-stock { color: #9a9aae; }
+.tooltip-empty {
+  font-size: 12px;
+  color: #c8c4c0;
+  padding: 8px 0;
+  text-align: center;
+}
+
+/* 右：操作按钮 */
+.card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  padding-left: 4px;
+}
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.action-item:hover { background: #f5f3f0; }
+.action-item:active { background: #e0dcd8; }
+.action-item span {
+  font-size: 11px;
+  color: #5a5a6e;
+}
+
 .scope-popup {
   max-height: 60vh;
 }
@@ -973,9 +1274,10 @@ onActivated(() => {
 /* ── 编辑商品弹窗 ── */
 :deep(.edit-goods-dialog) {
   width: 92% !important;
+  max-width: 520px;
 }
 :deep(.edit-goods-dialog .van-dialog__content) {
-  max-height: 85vh;
+  max-height: 80vh;
   overflow-y: auto;
 }
 
@@ -1096,4 +1398,97 @@ onActivated(() => {
 .company-list { padding: 8px 16px 24px; max-height: 50vh; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 10px; }
 .company-item { flex: 0 0 calc(33.33% - 7px); padding: 10px 0; text-align: center; font-size: 14px; color: #1a1a2e; background: #f5f3f0; border-radius: 8px; cursor: pointer; }
 .company-item:active { background: #e0dcd8; }
+
+/* ── 商品管理左右双栏布局 ── */
+.goods-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.goods-sidebar {
+  width: 150px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a2e;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid #f0ece8;
+  margin-bottom: 6px;
+}
+.sidebar-cat {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #5a5a6e;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.sidebar-cat:hover {
+  background: #faf8f6;
+}
+.sidebar-cat:active {
+  background: #f5f3f0;
+}
+.sidebar-cat.active {
+  color: #e8573a;
+  font-weight: 600;
+  background: #fef5f2;
+  border-left-color: #e8573a;
+}
+.goods-main {
+  flex: 1;
+  min-width: 0;
+}
+.toolbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f5f3f0;
+  padding-bottom: 8px;
+}
+
+/* 移动端：sidebar 折叠为横向滚动条 */
+@media (max-width: 640px) {
+  .goods-layout {
+    flex-direction: column;
+  }
+  .goods-sidebar {
+    width: 100%;
+    position: static;
+    max-height: none;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 8px 12px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sidebar-title {
+    display: none;
+  }
+  .sidebar-cat {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    font-size: 12px;
+    white-space: nowrap;
+    border-left: none;
+    border-radius: 14px;
+    background: #f5f3f0;
+  }
+  .sidebar-cat.active {
+    background: #e8573a;
+    color: #fff;
+    border-left: none;
+  }
+}
 </style>

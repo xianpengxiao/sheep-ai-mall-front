@@ -180,7 +180,7 @@ import { showToast, showConfirmDialog } from 'vant'
 import { useUserStore } from '../../stores/user.js'
 import { getShopInfo } from '../../api/merchant.js'
 import { getTree } from '../../api/category.js'
-import { getSpuPage, getSkuBySpuId } from '../../api/goods.js'
+import { getSpuPage } from '../../api/goods.js'
 import GoodsCard from '../../components/GoodsCard.vue'
 
 const router = useRouter()
@@ -359,15 +359,9 @@ onMounted(async () => {
   }
 })
 
-// keep-alive 重新激活时刷新商家状态
-onActivated(async () => {
-  if (!userStore.isLogin) { merchantVerified.value = null; return }
-  try {
-    await getShopInfo()
-    merchantVerified.value = true
-  } catch {
-    merchantVerified.value = false
-  }
+// keep-alive 重新激活时重置商家验证状态（等用户点击商家中心再检测）
+onActivated(() => {
+  merchantVerified.value = null
 })
 
 // 全局点击 → 关闭搜索下拉
@@ -404,24 +398,11 @@ async function onLoad() {
     const page = res || {}
     let records = page.records || []
 
-    // 过滤已打烊商家的商品（shopStatus: 0=打烊, 其他值=营业中或无商家）
-    records = records.filter(r => r.shopStatus === undefined || r.shopStatus === null || String(r.shopStatus) !== '0')
+    // 过滤已下架（status=0）和已打烊商家的商品
+    records = records.filter(r => String(r.status) !== '0' && (r.shopStatus === undefined || r.shopStatus === null || String(r.shopStatus) !== '0'))
 
-    // 批量获取每个 SPU 下 SKU 的最低价格
-    if (records.length > 0) {
-      const results = await Promise.allSettled(
-        records.map(r => getSkuBySpuId(r.id))
-      )
-      records.forEach((record, i) => {
-        const skus = results[i].value
-        if (Array.isArray(skus) && skus.length > 0) {
-          const minPrice = Math.min(...skus.map(s => Number(s.price || 0)))
-          record.minPrice = minPrice.toFixed(2)
-        } else {
-          record.minPrice = '0.00'
-        }
-      })
-    }
+    // 后端已返回 minPrice，无值则显示 0.00
+    records.forEach(r => { if (!r.minPrice && r.minPrice !== 0) r.minPrice = '0.00' })
 
     goodsList.value.push(...records)
     pageNum.value++

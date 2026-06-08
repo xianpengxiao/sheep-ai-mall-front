@@ -9,8 +9,20 @@
         label="商品名称"
         placeholder="请输入商品名称"
         :rules="[{ required: true, message: '请输入商品名称' }]"
-      />
-      <van-field v-model="form.subTitle" label="副标题" placeholder="请输入副标题" />
+      >
+        <template #button>
+          <van-button
+            size="small"
+            round
+            plain
+            class="ai-btn"
+            :loading="aiLoading"
+            :disabled="aiLoading"
+            @click="handleAiGenerate"
+          >AI生成文案</van-button>
+        </template>
+      </van-field>
+      <van-field v-model="form.subTitle" label="副标题（核心卖点）" placeholder="请输入副标题或核心卖点，多个用逗号分隔" />
       <van-field v-model="form.brand" label="品牌" placeholder="请输入品牌" />
       <van-field
         v-model="form.categoryName"
@@ -21,6 +33,15 @@
         :rules="[{ required: true, message: '请选择分类' }]"
         @click="showCategoryPicker = true"
       />
+      <van-field
+        v-model="form.description"
+        label="商品详情"
+        placeholder="请输入商品详情"
+        :rows="4"
+        autosize
+        type="textarea"
+      />
+      <div v-if="aiData" class="ai-saved-hint">已使用 AI 生成文案</div>
     </div>
 
     <!-- ═══════ 商品图片 ═══════ -->
@@ -29,7 +50,7 @@
 
       <div class="upload-group">
         <div class="upload-label">主图 <span class="required">*</span></div>
-        <div class="upload-box" @click="triggerFileInput('main')">
+        <div class="upload-box upload-box-main" @click="triggerFileInput('main')">
           <img v-if="mainImagePreview" :src="mainImagePreview" class="upload-preview" />
           <div v-else class="upload-placeholder">
             <van-icon name="photograph" size="32" color="#c8c4c0" />
@@ -44,8 +65,8 @@
       <div class="upload-group">
         <div class="upload-label">详情轮播图</div>
         <div class="upload-list">
-          <div v-for="(img, i) in imageListPreview" :key="i" class="upload-item">
-            <img :src="img" class="upload-preview" />
+          <div v-for="(item, i) in imageItems" :key="i" class="upload-item">
+            <img :src="item.url" class="upload-preview" />
             <div class="upload-item-overlay" @click="removeDetailImage(i)">
               <van-icon name="cross" size="16" color="#fff" />
             </div>
@@ -124,7 +145,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue'
 import { showToast } from 'vant'
-import { uploadImage } from '../../api/merchant.js'
+import { uploadImage, generateProductCopy, saveProductCopy } from '../../api/merchant.js'
 import { getTree } from '../../api/category.js'
 
 const props = defineProps({
@@ -145,11 +166,42 @@ const form = reactive({
   categoryName: '',
   mainImage: '',
   imageList: [],
+  description: '',
   status: 1,
   skuList: [
     { spec: '', price: '', stock: '', image: '', _file: null, _preview: '' },
   ],
 })
+
+// ═══════════════ AI 生成营销文案 ═══════════════
+const aiLoading = ref(false)
+const aiSaving = ref(false)
+/** AI 返回的原始数据，非空表示已生成过 */
+const aiData = ref(null)
+
+async function handleAiGenerate() {
+  if (!form.name) return showToast('请先输入商品名称')
+  if (!form.subTitle) return showToast('请先输入副标题（核心卖点）')
+  aiLoading.value = true
+  try {
+    const res = await generateProductCopy({
+      productName: form.name,
+      coreSellingPoints: form.subTitle,
+    })
+    // 保存 AI 响应，提交表单时一同保存
+    aiData.value = res
+    // 仅回填商品详情和副标题，不覆盖商品名称
+    if (res.detail) form.description = res.detail
+    if (res.sellPoints?.length) {
+      form.subTitle = res.sellPoints.join('、')
+    }
+    showToast('AI文案生成成功，请确认并编辑')
+  } catch {
+    showToast('AI文案生成失败，请重试')
+  } finally {
+    aiLoading.value = false
+  }
+}
 
 // ═══════════════ 分类选择 ═══════════════
 const showCategoryPicker = ref(false)
@@ -186,8 +238,8 @@ const skuFileInputRef = ref(null)
 
 const mainImagePreview = ref('')
 const mainImageFile = ref(null)
-const imageListPreview = ref([])
-const imageListFiles = ref([])
+/** 详情图片：{ url: string(预览/线上URL), file: File|null(新上传才有值) } */
+const imageItems = ref([])
 
 let skuUploadIndex = -1
 
@@ -217,8 +269,7 @@ function onDetailFileChange(e) {
   for (const f of files) {
     const reader = new FileReader()
     reader.onload = (ev) => {
-      imageListPreview.value.push(ev.target?.result || '')
-      imageListFiles.value.push(f)
+      imageItems.value.push({ url: ev.target?.result || '', file: f })
     }
     reader.readAsDataURL(f)
   }
@@ -226,8 +277,12 @@ function onDetailFileChange(e) {
 }
 
 function removeDetailImage(i) {
-  imageListPreview.value.splice(i, 1)
-  imageListFiles.value.splice(i, 1)
+  const removed = imageItems.value.splice(i, 1)[0]
+  // 已有线上图片 → 同步从 form.imageList 删除
+  if (removed && !removed.file) {
+    const idx = form.imageList.indexOf(removed.url)
+    if (idx !== -1) form.imageList.splice(idx, 1)
+  }
 }
 
 function triggerSkuFileInput(i) {
@@ -274,6 +329,7 @@ watch(() => props.initForm, (val) => {
   form.categoryName = val.categoryName || ''
   form.mainImage = val.mainImage || ''
   form.imageList = val.imageList || []
+  form.description = val.description || ''
   form.status = val.status ?? 1
 
   // SKU
@@ -294,9 +350,8 @@ watch(() => props.initForm, (val) => {
 
   // 预览回显
   mainImagePreview.value = val.mainImage || ''
-  imageListPreview.value = [...(val.imageList || [])]
+  imageItems.value = (val.imageList || []).map(url => ({ url, file: null }))
   mainImageFile.value = null
-  imageListFiles.value = []
 }, { immediate: true, deep: true })
 
 // ═══════════════ 提交 ═══════════════
@@ -312,11 +367,15 @@ async function handleSubmit() {
       form.mainImage = await uploadImage(mainImageFile.value, 'goods')
     }
 
-    // 2. 上传详情轮播图
-    const uploadedUrls = [...form.imageList]
-    for (const file of imageListFiles.value) {
-      const url = await uploadImage(file, 'goods')
-      uploadedUrls.push(url)
+    // 2. 上传详情轮播图（新文件才传，已有 URL 保留）
+    const uploadedUrls = []
+    for (const item of imageItems.value) {
+      if (item.file) {
+        const url = await uploadImage(item.file, 'goods')
+        uploadedUrls.push(url)
+      } else {
+        uploadedUrls.push(item.url)
+      }
     }
     form.imageList = uploadedUrls
 
@@ -327,7 +386,21 @@ async function handleSubmit() {
       }
     }
 
-    // 4. 构建提交数据
+    // 4. 如果使用过 AI 生成，一并保存文案记录（不影响商品发布）
+    if (aiData.value) {
+      try {
+        await saveProductCopy({
+          productName: form.name,
+          coreSellingPoints: form.subTitle,
+          title: aiData.value.title || form.name,
+          detail: form.description,
+          sellPoints: form.subTitle.split(/[,，、]/).filter(Boolean),
+        })
+      } catch { /* AI 保存失败不阻塞提交 */ }
+      aiData.value = null
+    }
+
+    // 5. 构建提交数据
     const payload = {
       categoryId: form.categoryId,
       name: form.name,
@@ -335,6 +408,7 @@ async function handleSubmit() {
       brand: form.brand,
       mainImage: form.mainImage,
       imageList: form.imageList,
+      description: form.description,
       status: form.status,
       skuList: form.skuList.map(({ _file, _preview, ...s }) => {
         const item = { skuName: s.spec, price: Number(s.price), stock: Number(s.stock) }
@@ -362,12 +436,13 @@ function resetForm() {
   form.categoryName = ''
   form.mainImage = ''
   form.imageList = []
+  form.description = ''
   form.status = 1
   form.skuList = [{ spec: '', price: '', stock: '', image: '', _file: null, _preview: '' }]
   mainImagePreview.value = ''
   mainImageFile.value = null
-  imageListPreview.value = []
-  imageListFiles.value = []
+  imageItems.value = []
+  aiData.value = null
 }
 
 function validate() {
@@ -414,6 +489,7 @@ defineExpose({ formRef, resetForm, validate })
 }
 .upload-box:hover { border-color: #e8573a; }
 .upload-box.small { width: 80px; min-height: 80px; }
+.upload-box-main { max-width: 200px; aspect-ratio: 1; }
 .upload-placeholder {
   display: flex;
   flex-direction: column;
@@ -490,4 +566,21 @@ defineExpose({ formRef, resetForm, validate })
   border: none !important; color: #fff !important;
 }
 .file-hidden { display: none; }
+
+/* ── AI 文案 ── */
+.ai-btn {
+  height: 28px !important;
+  font-size: 11px !important;
+  padding: 0 10px !important;
+  border-color: #e8573a !important;
+  color: #e8573a !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ai-saved-hint {
+  font-size: 12px;
+  color: #07c160;
+  text-align: right;
+  margin-top: 8px;
+}
 </style>

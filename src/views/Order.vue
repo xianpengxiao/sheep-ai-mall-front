@@ -234,11 +234,10 @@ function goEditAddress(addr) {
 
 // ── 过滤出选中商品 ──
 function filterItems(list, skuIds) {
-  const selected = new Set(skuIds)
+  const selected = new Set(skuIds.map(String))
   const result = []
-  // 在 store 中查找选中项的 quantity
   for (const item of list) {
-    if (selected.has(item.skuId)) {
+    if (selected.has(String(item.skuId))) {
       result.push(item)
     }
   }
@@ -264,7 +263,7 @@ async function fetchOrderItems() {
     loading.value = false
     return
   }
-  const skuIds = skuIdsStr.split(',').map(Number).filter(Boolean)
+  const skuIds = skuIdsStr.split(',').filter(Boolean)
   if (skuIds.length === 0) {
     loading.value = false
     return
