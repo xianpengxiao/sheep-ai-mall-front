@@ -180,7 +180,12 @@ async function onSmsLogin() {
     const data = await smsLogin(smsForm.phone, smsForm.code)
     handleLoginSuccess(data)
   } catch (e) {
-    showToast(e?.response?.data?.msg || e?.message || '登录失败')
+    const msg = e?.response?.data?.msg || e?.message || ''
+    // 拦截器已弹 toast，不重复提示
+    // 手机号未注册 → 引导去注册
+    if (msg.includes('未注册')) {
+      setTimeout(() => router.push('/register'), 1500)
+    }
   } finally { loading.value = false }
 }
 
@@ -196,7 +201,7 @@ async function handleSendCode() {
       if (codeCountdown.value <= 0) { clearInterval(countdownTimer); countdownTimer = null }
     }, 1000)
   } catch (e) {
-    showToast(e?.response?.data?.msg || '发送失败，请稍后重试')
+    // 拦截器已弹 toast（如"验证码已发送，请60秒后重试"），不重复提示
   }
 }
 

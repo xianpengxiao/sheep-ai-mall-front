@@ -37,12 +37,12 @@ export function updateAvatar(avatarUrl) {
 
 /** 发送短信验证码（登录用） */
 export function sendSmsCode(phone) {
-  return request.post('/auth/sms/code', { phone })
+  return request.post('/auth/send-login-code', null, { params: { phone } })
 }
 
-/** 短信验证码登录 */
+/** 短信验证码登录（直接登录，无需先调 verify-code） */
 export function smsLogin(phone, code) {
-  return request.post('/auth/sms/login', { phone, code })
+  return request.post('/auth/sms-login', { phone, code })
 }
 
 /** 检查手机号是否已注册 */
