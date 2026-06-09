@@ -35,6 +35,7 @@
             </div>
           </transition>
         </div>
+        <span v-if="hasAdminPerm" class="pc-nav-item" @click="$router.push('/admin')">管理中心</span>
         <!-- 登录 / 注册 或 用户信息 -->
         <template v-if="userStore.isLogin">
           <span class="pc-nav-item user-info" @click="$router.push('/profile')">
@@ -205,6 +206,17 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const isLoggedIn = computed(() => userStore.isLogin)
+const hasAdminPerm = computed(() => {
+  const perms = userStore.permissions
+  if (!Array.isArray(perms) || perms.length === 0) return false
+  const adminKeys = [
+    'sys:user:list', 'sys:user:update', 'sys:role:list',
+    'spu:audit:list', 'spu:audit',
+    'merchant:list', 'merchant:audit', 'merchant:audit:list', 'merchant:audit:info', 'merchant:disable',
+    'review:list', 'review:manage', 'review:delete',
+  ]
+  return adminKeys.some(p => perms.includes(p))
+})
 
 /** 鉴权拦截：未登录跳转登录页，登录后 redirect 回原页面 */
 function authGuardThen(path) {
@@ -572,6 +584,7 @@ async function onLoad() {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
 .drop-icon {
   font-size: 28px;
   flex-shrink: 0;

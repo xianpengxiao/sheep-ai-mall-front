@@ -105,6 +105,13 @@ const routes = [
     component: () => import('../views/merchant/PublishGoods.vue'),
     meta: { title: '发布商品', requiresAuth: true },
   },
+  // ── 管理后台 ──
+  {
+    path: '/admin',
+    name: 'AdminCenter',
+    component: () => import('../views/admin/Index.vue'),
+    meta: { title: '管理中心', requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

@@ -2,52 +2,117 @@
   <div class="page-merchant">
     <NavBar title="我的店铺" />
 
-    <!-- ==================== 🏪 店铺信息头部 ==================== -->
+    <!-- ==================== 🏪 方案B · 极简信息流 ==================== -->
     <div v-if="shopInfo" class="shop-header">
-      <div class="shop-header-main" @click="openShopDetail">
-        <div class="shop-avatar">
-          <van-image width="64" height="64" :src="shopInfo.shopLogo || defaultLogo" class="shop-logo-img" />
+      <!-- 顶栏：左侧信息区 + 右侧操作区 -->
+      <div class="sh-top">
+        <div class="sh-avatar">
+          <van-image width="52" height="52" :src="shopInfo.shopLogo || defaultLogo" class="sh-avatar-img" />
         </div>
-        <div class="shop-meta">
-          <div class="shop-name">{{ shopInfo.shopName }}</div>
-          <div class="shop-contact">{{ shopInfo.contactName }} | {{ shopInfo.contactPhone }}</div>
-          <div class="shop-scope">{{ shopInfo.businessScope || '未设置经营范围' }}</div>
+        <div class="sh-info">
+          <div class="sh-name-row">
+            <span class="sh-name">{{ shopInfo.shopName }}</span>
+            <span class="sh-badge" :class="shopInfo.shopStatus === 1 ? 'on' : 'off'">
+              <span class="sh-dot"></span>
+              {{ shopInfo.shopStatus === 1 ? '营业中' : '休息中' }}
+            </span>
+          </div>
+          <div class="sh-tags">
+            <span class="sh-tag" v-if="shopInfo.businessHours">{{ shopInfo.businessHours }}</span>
+            <span class="sh-tag" v-if="shopInfo.afterSaleInfo">{{ shopInfo.afterSaleInfo }}</span>
+          </div>
+          <div class="sh-meta">{{ shopInfo.contactPhone || shopInfo.contactName }}</div>
+          <div class="sh-scope">{{ shopInfo.businessScope?.split('、').join(' · ') || '未设置经营范围' }}</div>
+        </div>
+        <div class="sh-actions">
+          <div class="sh-edit" @click="openShopDetail">
+            <van-icon name="edit" size="18" />
+            <span>编辑店铺</span>
+          </div>
+          <div class="sh-status-toggle">
+            <van-switch v-model="shopInfo.shopStatus" :active-value="1" :inactive-value="0" size="18" @change="handleShopStatusChange" />
+            <span class="sh-status-label">{{ shopInfo.shopStatus === 1 ? '营业中' : '休息中' }}</span>
+          </div>
         </div>
       </div>
-      <div class="shop-status-row">
-        <span class="shop-status-label">营业状态</span>
-        <van-switch v-model="shopInfo.shopStatus" :active-value="1" :inactive-value="0" size="20" @change="handleShopStatusChange" />
-        <span class="shop-status-text" :class="shopInfo.shopStatus === 1 ? 'on' : 'off'">{{ shopInfo.shopStatus === 1 ? '营业中' : '已打烊' }}</span>
+
+      <!-- 店铺简介行 -->
+      <div class="sh-desc-row" v-if="shopInfo.shopDesc">
+        <span class="sh-desc-label">店铺简介：</span>
+        <span class="sh-desc-text">{{ shopInfo.shopDesc }}</span>
+      </div>
+
+      <!-- 评分行 -->
+      <div class="sh-score">
+        <span class="sh-star">★</span> <span class="sh-num">{{ shopInfo.describeScore ?? '--' }}</span>
+        <span class="sh-gap"></span>
+        <span class="sh-star">★</span> <span class="sh-num">{{ shopInfo.serviceScore ?? '--' }}</span>
+        <span class="sh-gap"></span>
+        <span class="sh-star">★</span> <span class="sh-num">{{ shopInfo.logisticsScore ?? '--' }}</span>
+        <span class="sh-total">{{ shopInfo.dsrCount || 0 }}条评价</span>
       </div>
     </div>
     <van-loading v-else-if="shopLoading" class="loading-center" size="24" />
 
-    <!-- 店铺详情弹窗（点击头部弹出） -->
-    <van-dialog v-model:show="showShopDetail" title="店铺信息" :show-confirm-button="false" closeable close-icon-position="top-left">
-      <div class="dialog-body">
-        <div class="logo-upload-wrap" @click="logoInputRef?.click()">
-          <van-image width="72" height="72" :src="shopForm.logoPreview || shopInfo?.shopLogo || defaultLogo" class="logo-preview" />
-          <div class="logo-overlay">
-            <van-icon name="camera-o" size="20" color="#fff" />
+    <!-- 店铺公告（独立模块） -->
+    <div class="sh-notice" v-if="shopInfo?.shopNotice">
+      <div class="sh-notice-inner">
+        <van-icon name="volume-o" size="16" class="sh-notice-icon" />
+        <span class="sh-notice-text">{{ shopInfo.shopNotice }}</span>
+      </div>
+    </div>
+
+    <!-- 店铺信息编辑弹窗 -->
+    <van-dialog v-model:show="showShopDetail" title="编辑店铺信息" :show-confirm-button="false" closeable close-icon-position="top-left" class="shop-edit-dialog">
+      <div class="dialog-body shop-edit-body">
+        <!-- 图片上传区 -->
+        <div class="upload-row">
+          <div class="upload-col">
+            <div class="upload-label">店铺 Logo</div>
+            <div class="upload-box logo-box" @click="logoInputRef?.click()">
+              <img v-if="shopForm.logoPreview" :src="shopForm.logoPreview" class="upload-preview" />
+              <img v-else :src="shopInfo?.shopLogo || defaultLogo" class="upload-preview" />
+              <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
+            </div>
+          </div>
+          <div class="upload-col">
+            <div class="upload-label">营业执照 <span class="required">*</span><span class="audit-hint">需审核</span></div>
+            <div class="upload-box cert-box" @click="licenseInputRef?.click()">
+              <img v-if="shopForm.licensePreview" :src="shopForm.licensePreview" class="upload-preview" />
+              <img v-else :src="shopInfo?.businessLicense" class="upload-preview" style="object-fit: contain;" />
+              <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
+            </div>
+          </div>
+          <div class="upload-col">
+            <div class="upload-label">食品许可证 <span class="optional">可选</span><span class="audit-hint">需审核</span></div>
+            <div class="upload-box cert-box" @click="foodLicenseInputRef?.click()">
+              <img v-if="shopForm.foodLicensePreview" :src="shopForm.foodLicensePreview" class="upload-preview" />
+              <img v-else-if="shopInfo?.foodLicense" :src="shopInfo?.foodLicense" class="upload-preview" style="object-fit: contain;" />
+              <div v-else class="upload-placeholder"><van-icon name="plus" size="24" color="#c8c4c0" /></div>
+              <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
+            </div>
           </div>
         </div>
         <input ref="logoInputRef" type="file" accept="image/*" class="file-hidden" @change="onLogoSelected" />
-        <!-- 营业执照 -->
-        <div class="license-section">
-          <span class="license-label">营业执照</span>
-          <van-image
-            width="100%"
-            height="auto"
-            fit="contain"
-            :src="shopInfo?.businessLicense"
-            class="license-img"
-          />
-        </div>
-        <van-field v-model="shopForm.shopName" label="店铺名称" placeholder="请输入店铺名称" />
+        <input ref="licenseInputRef" type="file" accept="image/*" class="file-hidden" @change="onLicenseSelected" />
+        <input ref="foodLicenseInputRef" type="file" accept="image/*" class="file-hidden" @change="onFoodLicenseSelected" />
+
+        <!-- 表单字段 -->
+        <van-field v-model="shopForm.shopName" label="店铺名称" placeholder="请输入店铺名称" maxlength="50" :rules="[{ required: true, message: '请输入店铺名称' }]" />
         <van-field v-model="shopForm.businessScope" is-link readonly label="经营范围" placeholder="请选择经营范围" :rules="[{ required: true, message: '请选择经营范围' }]" @click="openScopePicker" />
         <van-field v-model="shopForm.contactName" label="联系人" placeholder="请输入联系人姓名" />
-        <van-field v-model="shopForm.contactPhone" label="联系电话" type="tel" placeholder="请输入联系电话" />
+        <van-field v-model="shopForm.contactPhone" label="联系电话" type="tel" placeholder="请输入联系电话" maxlength="11" :rules="[{ pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'onBlur' }]" />
+
+        <van-field v-model="shopForm.shopDesc" label="店铺简介" type="textarea" placeholder="请输入店铺简介" :rows="3" autosize />
+        <van-field v-model="shopForm.shopNotice" label="店铺公告" type="textarea" placeholder="请输入店铺公告" :rows="2" autosize />
+        <van-field v-model="shopForm.businessHours" label="营业时间" placeholder="如：09:00-22:00" />
+        <van-field v-model="shopForm.afterSaleInfo" label="售后说明" type="textarea" placeholder="请输入售后说明" :rows="2" autosize />
+
+        <van-field v-model="shopForm.legalPerson" label="法人信息" placeholder="选填，输入法人姓名" />
+        <van-field v-model="shopForm.businessAddress" label="经营地址" placeholder="选填，输入经营地址" />
+
         <van-button round block class="dialog-btn" @click="handleSaveShop" :loading="shopSaving">保存</van-button>
+      </div>
 
       <!-- 经营范围多选 -->
       <van-popup v-model:show="showScopePicker" round position="bottom" class="scope-popup">
@@ -64,7 +129,6 @@
           </van-checkbox-group>
         </div>
       </van-popup>
-      </div>
     </van-dialog>
 
 
@@ -121,7 +185,9 @@
                 <div class="card-brand-row">
                   <span class="card-brand">{{ item.brand || '未知品牌' }}</span>
                   <span class="card-tag" :class="item.status === 1 ? 'tag-on' : 'tag-off'">{{ item.status === 1 ? '上架' : '下架' }}</span>
+                  <span class="audit-tag" :class="auditTagClass(item.auditStatus)">{{ auditTagText(item.auditStatus) }}</span>
                 </div>
+                <div class="card-audit-msg" v-if="item.auditStatus === 2 && item.auditMsg">驳回原因：{{ item.auditMsg }}</div>
                 <div class="card-price">¥{{ item.minPrice ?? '0.00' }}</div>
 
                 <!-- 库存信息区（悬浮展示 SKU 明细） -->
@@ -467,9 +533,18 @@ const shopInfo = ref(null)
 const showShopDetail = ref(false)
 const shopSaving = ref(false)
 
-const shopForm = reactive({ shopName: '', businessScope: '', contactName: '', contactPhone: '', logoPreview: '' })
+const shopForm = reactive({
+  shopName: '', businessScope: '', contactName: '', contactPhone: '',
+  shopDesc: '', shopNotice: '', businessHours: '', afterSaleInfo: '',
+  legalPerson: '', businessAddress: '',
+  logoPreview: '', licensePreview: '', foodLicensePreview: '',
+})
 const logoInputRef = ref(null)
+const licenseInputRef = ref(null)
+const foodLicenseInputRef = ref(null)
 const logoFile = ref(null)
+const licenseFile = ref(null)
+const foodLicenseFile = ref(null)
 
 function onLogoSelected(e) {
   const f = e.target.files?.[0]
@@ -478,6 +553,25 @@ function onLogoSelected(e) {
   const reader = new FileReader()
   reader.onload = (ev) => { shopForm.logoPreview = ev.target?.result || '' }
   reader.readAsDataURL(f)
+  e.target.value = ''
+}
+function onLicenseSelected(e) {
+  const f = e.target.files?.[0]
+  if (!f) return
+  licenseFile.value = f
+  const reader = new FileReader()
+  reader.onload = (ev) => { shopForm.licensePreview = ev.target?.result || '' }
+  reader.readAsDataURL(f)
+  e.target.value = ''
+}
+function onFoodLicenseSelected(e) {
+  const f = e.target.files?.[0]
+  if (!f) return
+  foodLicenseFile.value = f
+  const reader = new FileReader()
+  reader.onload = (ev) => { shopForm.foodLicensePreview = ev.target?.result || '' }
+  reader.readAsDataURL(f)
+  e.target.value = ''
 }
 
 async function fetchShop() {
@@ -489,12 +583,24 @@ async function fetchShop() {
 
 function openShopDetail() {
   if (!shopInfo.value) return
-  shopForm.shopName = shopInfo.value.shopName || ''
-  shopForm.businessScope = shopInfo.value.businessScope || ''
-  shopForm.contactName = shopInfo.value.contactName || ''
-  shopForm.contactPhone = shopInfo.value.contactPhone || ''
+  const s = shopInfo.value
+  shopForm.shopName = s.shopName || ''
+  shopForm.businessScope = s.businessScope || ''
+  shopForm.contactName = s.contactName || ''
+  shopForm.contactPhone = s.contactPhone || ''
+  shopForm.shopDesc = s.shopDesc || ''
+  shopForm.shopNotice = s.shopNotice || ''
+  shopForm.businessHours = s.businessHours || ''
+  shopForm.afterSaleInfo = s.afterSaleInfo || ''
+  shopForm.legalPerson = s.legalPerson || ''
+  shopForm.businessAddress = s.businessAddress || ''
+  // 图片预览重置
   shopForm.logoPreview = ''
+  shopForm.licensePreview = ''
+  shopForm.foodLicensePreview = ''
   logoFile.value = null
+  licenseFile.value = null
+  foodLicenseFile.value = null
   showShopDetail.value = true
 }
 
@@ -502,13 +608,51 @@ async function handleSaveShop() {
   if (!shopForm.shopName) return showToast('请输入店铺名称')
   shopSaving.value = true
   try {
+    // 上传图片
     let logoUrl = shopInfo.value?.shopLogo
     if (logoFile.value) {
       const { uploadImage } = await import('../../api/merchant.js')
       logoUrl = await uploadImage(logoFile.value, 'cert')
     }
-    await updateShopInfo({ shopName: shopForm.shopName, businessScope: shopForm.businessScope, contactName: shopForm.contactName, contactPhone: shopForm.contactPhone, shopLogo: logoUrl })
-    showToast('保存成功')
+    let licenseUrl = shopInfo.value?.businessLicense
+    if (licenseFile.value) {
+      const { uploadImage } = await import('../../api/merchant.js')
+      licenseUrl = await uploadImage(licenseFile.value, 'cert')
+    }
+    let foodLicenseUrl = shopInfo.value?.foodLicense
+    if (foodLicenseFile.value) {
+      const { uploadImage } = await import('../../api/merchant.js')
+      foodLicenseUrl = await uploadImage(foodLicenseFile.value, 'cert')
+    }
+
+    await updateShopInfo({
+      shopName: shopForm.shopName,
+      businessScope: shopForm.businessScope,
+      contactName: shopForm.contactName,
+      contactPhone: shopForm.contactPhone,
+      shopLogo: logoUrl,
+      businessLicense: licenseUrl,
+      foodLicense: foodLicenseUrl,
+      shopDesc: shopForm.shopDesc,
+      shopNotice: shopForm.shopNotice,
+      businessHours: shopForm.businessHours,
+      afterSaleInfo: shopForm.afterSaleInfo,
+      legalPerson: shopForm.legalPerson,
+      businessAddress: shopForm.businessAddress,
+    })
+
+    // A 类（资质类）字段需审核：businessLicense, foodLicense, contactName, contactPhone, legalPerson, businessAddress, businessScope
+    const prev = shopInfo.value
+    const aChanged = (
+      shopForm.businessScope !== (prev?.businessScope || '') ||
+      shopForm.contactName !== (prev?.contactName || '') ||
+      shopForm.contactPhone !== (prev?.contactPhone || '') ||
+      shopForm.legalPerson !== (prev?.legalPerson || '') ||
+      shopForm.businessAddress !== (prev?.businessAddress || '') ||
+      licenseFile.value !== null ||
+      foodLicenseFile.value !== null
+    )
+    showToast(aChanged ? '修改已提交，等待平台审核' : '修改成功')
     showShopDetail.value = false
     await fetchShop()
   } catch { /* toast by interceptor */ }
@@ -628,7 +772,7 @@ async function editGoods(item) {
 
 async function handleEditGoods(payload) {
   await updateMerchantGoods(editGoodsId.value, payload)
-  showToast('保存成功')
+  showToast('修改已提交，等待平台审核')
   showEditGoods.value = false
   goodsPage.value = 1; goodsFinished.value = false; fetchGoods()
 }
@@ -636,6 +780,11 @@ async function handleEditGoods(payload) {
 async function handleToggle(item) {
   const action = item.status === 1 ? '下架' : '上架'
   const newStatus = item.status === 1 ? 0 : 1
+  // 上架必须审核通过
+  if (newStatus === 1 && item.auditStatus !== 1) {
+    const msg = item.auditStatus === 2 ? '商品已被驳回，请修改后重新提交' : '商品待审核，请等待平台审核通过后上架'
+    return showToast(msg)
+  }
   try {
     await showConfirmDialog({ title: '提示', message: `确认${action}该商品？`, confirmButtonText: '确定', cancelButtonText: '取消' })
     await toggleMerchantGoodsStatus(item.id, newStatus)
@@ -663,6 +812,14 @@ function stockStatusText(status) {
 }
 function stockStatusClass(status) {
   const map = { 0: 'stock-oos', 1: 'stock-ok', 2: 'stock-low' }
+  return map[status] ?? ''
+}
+function auditTagClass(status) {
+  const map = { 0: 'audit-pending', 1: 'audit-passed', 2: 'audit-reject' }
+  return map[status] ?? ''
+}
+function auditTagText(status) {
+  const map = { 0: '待审核', 1: '已通过', 2: '已驳回' }
   return map[status] ?? ''
 }
 function handleStockManage(item) {
@@ -869,35 +1026,145 @@ onActivated(() => {
 .loading-center { padding: 60px 0; }
 .tab-content { padding: 12px 16px 24px; }
 
-/* ── 店铺头部 ── */
+/* ── 方案B · 极简信息流 ── */
 .shop-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 20px 16px;
   background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%);
   color: #fff;
-  position: relative;
 }
-.shop-avatar {
+.sh-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 18px 12px;
+}
+.sh-avatar {
   flex-shrink: 0;
-  width: 68px;
-  height: 68px;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.1);
+}
+.sh-avatar-img { border-radius: 50%; }
+.sh-info { flex: 1; min-width: 0; }
+.sh-name-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: 2px solid rgba(255,255,255,0.4);
-  border-radius: 14px;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.sh-name { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.sh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.sh-badge.on { background: rgba(105,240,174,0.2); color: #69f0ae; }
+.sh-badge.off { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); }
+.sh-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.sh-badge.on .sh-dot { box-shadow: 0 0 3px currentColor; }
+.sh-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.sh-tag {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
   overflow: hidden;
-  background: rgba(255,255,255,0.15);
+  text-overflow: ellipsis;
+  max-width: 160px;
 }
-.shop-logo-img {
+.sh-meta { font-size: 13px; font-weight: 600; opacity: 0.55; }
+.sh-scope { font-size: 11px; opacity: 0.55; margin-top: 2px; }
+.sh-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 2px;
+  max-width: 110px;
+}
+.sh-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.2);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.sh-edit:hover { background: rgba(255,255,255,0.32); }
+.sh-edit :deep(.van-icon) { color: #fff; }
+
+/* ── 右侧状态开关 ── */
+.sh-status-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.sh-status-label {
+  font-size: 10px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* ── 店铺简介行 ── */
+.sh-desc-row {
+  padding: 2px 18px 10px;
+  display: flex;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sh-desc-label { color: rgba(255,255,255,0.5); white-space: nowrap; flex-shrink: 0; }
+.sh-desc-text { color: rgba(255,255,255,0.85); word-break: break-word; flex: 1; }
+
+/* ── 评分行 ── */
+.sh-score {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.06);
+  font-size: 13px;
+  gap: 0;
+}
+.sh-star { color: #ffd54f; font-size: 14px; margin-right: 2px; }
+.sh-num { font-weight: 700; font-size: 14px; }
+.sh-gap {
+  width: 1px; height: 12px;
+  background: rgba(255,255,255,0.2);
+  margin: 0 10px;
+}
+.sh-total { font-size: 11px; opacity: 0.55; margin-left: auto; }
+
+/* ── 公告独立模块 ── */
+.sh-notice { padding: 0 16px 6px; }
+.sh-notice-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff8e6;
   border-radius: 12px;
+  border: 1px solid #fceebe;
 }
-.shop-meta { flex: 1; min-width: 0; }
-.shop-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-.shop-contact { font-size: 13px; opacity: 0.9; }
-.shop-scope { font-size: 12px; opacity: 0.75; margin-top: 2px; }
+.sh-notice-icon { flex-shrink: 0; color: #f39c12; }
+.sh-notice-text { font-size: 13px; color: #8d6e00; line-height: 1.5; flex: 1; min-width: 0; }
 
 /* ── 订单汇总 ── */
 .order-summary { font-size: 13px; color: #9a9aae; margin-bottom: 8px; }
@@ -909,39 +1176,65 @@ onActivated(() => {
 }
 
 /* ── 弹窗表单 ── */
-.dialog-body { padding: 16px 20px 24px; display: flex; flex-direction: column; align-items: center; }
-.license-section {
-  width: 100%;
-  margin-bottom: 12px;
-}
-.license-label {
-  display: block;
-  font-size: 13px;
-  color: #5a5a6e;
-  margin-bottom: 6px;
-}
-.license-img {
-  border-radius: 8px;
-  border: 1px solid #f0ece8;
-}
+.dialog-body { padding: 16px 20px 24px; display: flex; flex-direction: column; }
+.shop-edit-body { align-items: stretch; }
 .dialog-btn {
-  margin-top: 16px; height: 40px; font-size: 14px; font-weight: 600;
+  margin-top: 20px; height: 42px; font-size: 15px; font-weight: 600;
   background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important;
   border: none !important; color: #fff !important; width: 100%;
 }
 
-/* ── Logo 上传 ── */
-.logo-upload-wrap {
-  position: relative;
-  width: 72px;
-  height: 72px;
+/* ── 图片上传区 ── */
+.upload-row {
+  display: flex;
+  gap: 12px;
   margin-bottom: 16px;
-  cursor: pointer;
-  border-radius: 12px;
-  overflow: hidden;
+  flex-wrap: wrap;
 }
-.logo-preview { border-radius: 12px; }
-.logo-overlay {
+.upload-col {
+  flex: 1;
+  min-width: 80px;
+  text-align: center;
+}
+.upload-col .upload-label {
+  font-size: 12px;
+  color: #5a5a6e;
+  margin-bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.required { color: #e8573a; }
+.optional { font-size: 11px; color: #c8c4c0; font-weight: 400; }
+.audit-hint {
+  font-size: 10px;
+  color: #f39c12;
+  background: #fff8e6;
+  padding: 0 6px;
+  border-radius: 4px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.upload-box {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px dashed #e0dcd8;
+  background: #faf8f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s;
+}
+.upload-box:hover { border-color: #e8573a; }
+.upload-box.logo-box { max-width: 80px; margin: 0 auto; border-radius: 12px; }
+.upload-box.cert-box { border-radius: 8px; }
+.upload-preview { width: 100%; height: 100%; object-fit: cover; }
+.upload-placeholder { color: #c8c4c0; }
+.upload-overlay {
   position: absolute;
   inset: 0;
   background: rgba(0,0,0,0.4);
@@ -950,9 +1243,8 @@ onActivated(() => {
   justify-content: center;
   opacity: 0;
   transition: opacity 0.2s;
-  border-radius: 12px;
 }
-.logo-upload-wrap:hover .logo-overlay { opacity: 1; }
+.upload-box:hover .upload-overlay { opacity: 1; }
 .file-hidden { display: none; }
 
 /* ── 分类选择按钮 ── */
@@ -1104,6 +1396,13 @@ onActivated(() => {
 }
 .tag-on { background: #e8f8ee; color: #07c160; }
 .tag-off { background: #f5f3f0; color: #9a9aae; }
+
+/* ── 审核状态标签 ── */
+.audit-tag { font-size: 11px; padding: 1px 8px; border-radius: 10px; font-weight: 500; }
+.audit-tag.audit-pending { background: #fff3e0; color: #f39c12; }
+.audit-tag.audit-passed { background: #e8f8ee; color: #07c160; }
+.audit-tag.audit-reject { background: #fde8e5; color: #e8573a; }
+.card-audit-msg { font-size: 12px; color: #e8573a; margin-bottom: 4px; }
 
 /* 库存行 */
 .card-stock-row {
@@ -1280,6 +1579,14 @@ onActivated(() => {
   max-height: 80vh;
   overflow-y: auto;
 }
+:deep(.shop-edit-dialog) {
+  width: 90% !important;
+  max-width: 500px;
+}
+:deep(.shop-edit-dialog .van-dialog__content) {
+  max-height: 85vh;
+  overflow-y: auto;
+}
 
 /* ── 订单管理 ── */
 .order-item { display: flex; align-items: center; padding: 12px; }
@@ -1329,14 +1636,6 @@ onActivated(() => {
 .order-status-text.s-4 { background: #f5f3f0; color: #c8c4c0; }
 :deep(.order-detail-dialog) { width: 90% !important; }
 :deep(.order-detail-dialog .van-dialog__content) { max-height: 80vh; overflow-y: auto; }
-
-/* ── 店铺头部营业状态 ── */
-.shop-header-main { display: flex; align-items: center; gap: 14px; cursor: pointer; }
-.shop-status-row { display: flex; align-items: center; gap: 6px; padding: 8px 16px 4px; }
-.shop-status-label { font-size: 12px; opacity: 0.8; }
-.shop-status-text { font-size: 12px; font-weight: 600; }
-.shop-status-text.on { color: #4caf50; }
-.shop-status-text.off { color: rgba(255,255,255,0.6); }
 
 /* ── 营收概览 ── */
 .revenue-cards { display: flex; gap: 8px; margin-bottom: 10px; }

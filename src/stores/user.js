@@ -8,6 +8,11 @@ export const useUserStore = defineStore('user', {
 
   getters: {
     isLogin: (state) => !!state.token,
+    /** 当前用户权限列表 */
+    permissions: (state) => {
+      if (!state.memberInfo?.permissions) return []
+      return Array.isArray(state.memberInfo.permissions) ? state.memberInfo.permissions : []
+    },
     /** 是否已入驻商家（通过 roles 判断，登录时 backend 返回） */
     isMerchant: (state) => {
       if (!state.memberInfo?.roles) return false
