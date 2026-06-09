@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { showConfirmDialog } from 'vant'
 import { useUserStore } from '../stores/user.js'
 
 const routes = [
@@ -116,23 +115,12 @@ const router = createRouter({
   },
 })
 
-// 路由守卫
-router.beforeEach(async (to, from, next) => {
+// 路由守卫：未登录自动跳转登录页，登录后返回原页面
+router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
 
   if (to.meta.requiresAuth && !userStore.isLogin) {
-    try {
-      await showConfirmDialog({
-        title: '提示',
-        message: '请先登录后再操作',
-        confirmButtonText: '去登录',
-        cancelButtonText: '返回',
-        confirmButtonColor: '#e8573a',
-      })
-      next({ name: 'Login', query: { redirect: to.fullPath } })
-    } catch {
-      next(false)
-    }
+    next({ name: 'Login', query: { redirect: to.fullPath } })
   } else if (to.name === 'Login' && userStore.isLogin) {
     next('/')
   } else {

@@ -5,8 +5,8 @@
       <div class="brand">SheepAI Mall</div>
       <nav class="pc-nav">
         <span class="pc-nav-item active">首页</span>
-        <span class="pc-nav-item" @click="$router.push('/cart')">购物车</span>
-        <span class="pc-nav-item" @click="$router.push('/profile')">个人中心</span>
+        <span class="pc-nav-item" @click="authGuardThen('/cart')">购物车</span>
+        <span class="pc-nav-item" @click="authGuardThen('/profile')">个人中心</span>
         <!-- 商家中心下拉 -->
         <div class="merchant-dropdown" @mouseenter="openMerchantDropdown" @mouseleave="merchantOpen = false">
           <span class="pc-nav-item merchant-trigger" :class="{ active: merchantOpen }">
@@ -35,16 +35,34 @@
             </div>
           </transition>
         </div>
+        <!-- 登录 / 注册 或 用户信息 -->
+        <template v-if="userStore.isLogin">
+          <span class="pc-nav-item user-info" @click="$router.push('/profile')">
+            <van-image
+              v-if="userStore.memberInfo?.avatar"
+              :src="userStore.memberInfo.avatar"
+              round
+              width="28"
+              height="28"
+              class="nav-avatar"
+            />
+            <van-icon v-else name="user-o" size="18" />
+            <span class="nav-username">{{ userStore.memberInfo?.realName || userStore.memberInfo?.username || '用户' }}</span>
+          </span>
+        </template>
+        <template v-else>
+          <span class="pc-nav-item login-btn" @click="$router.push('/login')">登录 / 注册</span>
+        </template>
       </nav>
       <div class="top-actions">
-        <div class="icon-btn" @click="goMerchantMobile">
+        <div class="icon-btn" @click="handleMerchantIcon">
           <van-icon name="shop-o" size="20" />
         </div>
-        <div class="icon-btn" @click="$router.push('/cart')">
+        <div class="icon-btn" @click="authGuardThen('/cart')">
           <van-icon name="shopping-cart-o" size="20" />
           <span class="badge" v-if="cartCount > 0">{{ cartCount > 99 ? '99+' : cartCount }}</span>
         </div>
-        <div class="icon-btn" @click="$router.push('/profile')">
+        <div class="icon-btn" @click="authGuardThen('/profile')">
           <van-icon name="user-o" size="20" />
         </div>
       </div>
@@ -176,9 +194,9 @@
 <script setup>
 import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, showConfirmDialog } from 'vant'
+import { showToast } from 'vant'
 import { useUserStore } from '../../stores/user.js'
-import { getShopInfo } from '../../api/merchant.js'
+import { getCurrentUser } from '../../api/member.js'
 import { getTree } from '../../api/category.js'
 import { getSpuPage } from '../../api/goods.js'
 import GoodsCard from '../../components/GoodsCard.vue'
@@ -187,6 +205,15 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const isLoggedIn = computed(() => userStore.isLogin)
+
+/** 鉴权拦截：未登录跳转登录页，登录后 redirect 回原页面 */
+function authGuardThen(path) {
+  if (!isLoggedIn.value) {
+    router.push({ name: 'Login', query: { redirect: path } })
+    return
+  }
+  router.push(path)
+}
 const merchantOpen = ref(false)
 // 是否已验证为商家（通过 /api/merchant/info 确认）
 const merchantVerified = ref(null) // null=未查 false=不是 true=是
@@ -205,20 +232,14 @@ async function openMerchantDropdown() {
   merchantOpen.value = true
   if (!isLoggedIn.value || merchantVerified.value !== null) return
   try {
-    await getShopInfo()
-    merchantVerified.value = true
+    const user = await getCurrentUser()
+    merchantVerified.value = Array.isArray(user.roles) && user.roles.includes('ROLE_MERCHANT')
   } catch {
     merchantVerified.value = false
   }
 }
 
 function goMerchant(target) {
-  if (!isLoggedIn.value) {
-    showConfirmDialog({ title: '提示', message: '请先登录后再操作', confirmButtonText: '去登录', cancelButtonText: '返回' })
-      .then(() => router.push({ name: 'Login', query: { redirect: '/merchant/apply' } }))
-      .catch(() => {})
-    return
-  }
   if (target === 'apply') {
     router.push(merchantVerified.value ? '/merchant/dashboard' : '/merchant/apply')
   } else if (target === 'dashboard') {
@@ -229,13 +250,30 @@ function goMerchant(target) {
 }
 
 function goMerchantMobile() {
+  router.push(merchantVerified.value ? '/merchant/dashboard' : '/merchant/apply')
+}
+
+/** 移动端商家图标点击：鉴权 + 商家校验 → 入驻页或店铺 */
+async function handleMerchantIcon() {
   if (!isLoggedIn.value) {
-    showConfirmDialog({ title: '提示', message: '请先登录后再操作', confirmButtonText: '去登录', cancelButtonText: '返回' })
-      .then(() => router.push({ name: 'Login', query: { redirect: '/merchant/apply' } }))
-      .catch(() => {})
+    router.push({ name: 'Login', query: { redirect: '/merchant/apply' } })
     return
   }
-  router.push(merchantVerified.value ? '/merchant/dashboard' : '/merchant/apply')
+  // 还没查过商家状态，查一下
+  if (merchantVerified.value === null) {
+    try {
+      const user = await getCurrentUser()
+      merchantVerified.value = Array.isArray(user.roles) && user.roles.includes('ROLE_MERCHANT')
+    } catch {
+      merchantVerified.value = false
+    }
+  }
+  if (!merchantVerified.value) {
+    showToast('您还不是商家，请先入驻')
+    router.push('/merchant/apply')
+    return
+  }
+  router.push('/merchant/dashboard')
 }
 
 // ── 搜索遮罩 ──
@@ -467,6 +505,29 @@ async function onLoad() {
 }
 .pc-nav-item.active {
   border-bottom-color: #e8573a;
+}
+.pc-nav-item.login-btn {
+  color: #e8573a;
+  font-weight: 600;
+  border-bottom: none;
+}
+.pc-nav-item.login-btn:hover {
+  color: #d63031;
+}
+.pc-nav-item.user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: none;
+  cursor: pointer;
+}
+.nav-avatar {
+  flex-shrink: 0;
+}
+.nav-username {
+  font-size: 13px;
+  font-weight: 500;
+  color: #5a5a6e;
 }
 
 /* ── 商家中心下拉 ── */

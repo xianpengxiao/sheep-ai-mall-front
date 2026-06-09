@@ -34,3 +34,33 @@ export function updateAvatar(avatarUrl) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   })
 }
+
+/** 发送短信验证码（登录用） */
+export function sendSmsCode(phone) {
+  return request.post('/auth/sms/code', { phone })
+}
+
+/** 短信验证码登录 */
+export function smsLogin(phone, code) {
+  return request.post('/auth/sms/login', { phone, code })
+}
+
+/** 检查手机号是否已注册 */
+export function checkPhone(phone) {
+  return request.get('/auth/check-phone', { params: { phone } })
+}
+
+/** 发送注册验证码 */
+export function sendRegisterCode(phone) {
+  return request.post('/auth/send-code', null, { params: { phone } })
+}
+
+/** 校验验证码 */
+export function verifyCode(phone, code) {
+  return request.post('/auth/verify-code', { phone, code })
+}
+
+/** 获取当前登录用户信息（含 roles 角色列表） */
+export function getCurrentUser() {
+  return request.get('/auth/me')
+}

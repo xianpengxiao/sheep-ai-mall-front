@@ -133,12 +133,19 @@
                 />
               </div>
 
+              <!-- ═══════ 下架提示 ═══════ -->
+              <div v-if="isOffShelf" class="off-shelf-banner">
+                <van-icon name="info-o" size="16" />
+                该商品已下架，无法购买
+              </div>
+
               <!-- ═══════ 操作按钮 ═══════ -->
               <div class="action-block">
                 <div class="action-row">
                   <van-button
                     round
                     class="action-btn-cart"
+                    :class="{ disabled: isOffShelf }"
                     color="linear-gradient(135deg, #e8573a 0%, #f39c12 100%)"
                     :loading="addingCart"
                     @click="addToCart"
@@ -146,6 +153,7 @@
                   <van-button
                     round
                     class="action-btn-buy"
+                    :class="{ disabled: isOffShelf }"
                     color="#d63031"
                     @click="buyNow"
                   >立即购买</van-button>
@@ -318,6 +326,9 @@ const displayPrice = computed(() => {
   return minSkuPrice.value || spu.value?.price || 0
 })
 
+/** 商品是否已下架（status=0） */
+const isOffShelf = computed(() => spu.value && String(spu.value.status) === '0')
+
 /** 可选最大数量：根据选中 SKU 的库存，默认 999 */
 const maxQuantity = computed(() => {
   if (selectedSku.value?.stock) {
@@ -400,6 +411,7 @@ async function fetchDetail() {
         name: raw.name || raw.title || '',
         subTitle: raw.subTitle || '',
         price: raw.price ?? 0,
+        status: raw.status,  // 1=上架 0=下架
         sales: raw.sales ?? raw.salesCount ?? 0,
         mainImage: raw.mainImage || raw.image || '',
         images: raw.imageList || raw.images || raw.imgs || raw.pics || raw.imageUrls || '',
@@ -446,6 +458,10 @@ function setActiveImage(index) {
 }
 
 async function addToCart() {
+  if (isOffShelf.value) {
+    showToast('商品已下架，无法加入购物车')
+    return
+  }
   if (!userStore.isLogin) {
     try {
       await showConfirmDialog({
@@ -500,6 +516,10 @@ async function addToCart() {
 }
 
 async function buyNow() {
+  if (isOffShelf.value) {
+    showToast('商品已下架，无法购买')
+    return
+  }
   if (!userStore.isLogin) {
     try {
       await showConfirmDialog({
@@ -920,6 +940,22 @@ watch(() => route.params.id, () => {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   下架横幅
+   ══════════════════════════════════════════════════════════════ */
+.off-shelf-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: #fde8e5;
+  border-radius: 10px;
+  color: #e8573a;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════════════════
    操作按钮
    ══════════════════════════════════════════════════════════════ */
 .action-block {
@@ -945,6 +981,11 @@ watch(() => route.params.id, () => {
   font-weight: 700;
   letter-spacing: 0.5px;
   border: none;
+}
+.action-btn-cart.disabled,
+.action-btn-buy.disabled {
+  opacity: 0.5;
+  filter: grayscale(0.8);
 }
 .cart-btn {
   width: 100%;
