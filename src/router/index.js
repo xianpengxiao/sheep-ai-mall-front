@@ -56,12 +56,12 @@ const routes = [
     component: () => import('../views/payment/index.vue'),
     meta: { title: '支付中心', requiresAuth: true },
   },
-  {
-    path: '/member/:pathMatch(.*)*',
-    name: 'Member',
-    component: () => import('../views/Member.vue'),
-    meta: { title: '会员中心', requiresAuth: true },
-  },
+  // {
+  //   path: '/member/:pathMatch(.*)*',
+  //   name: 'Member',
+  //   component: () => import('../views/Member.vue'),
+  //   meta: { title: '会员中心', requiresAuth: true },
+  // },
   {
     path: '/goods/:id',
     name: 'GoodsDetail',
@@ -111,6 +111,13 @@ const routes = [
     name: 'AdminCenter',
     component: () => import('../views/admin/Index.vue'),
     meta: { title: '管理中心', requiresAuth: true },
+  },
+  // ── 安全中心 ──
+  {
+    path: '/security',
+    name: 'SecurityCenter',
+    component: () => import('../views/SecurityCenter.vue'),
+    meta: { title: '安全中心', requiresAuth: true },
   },
 ]
 

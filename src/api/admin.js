@@ -75,3 +75,8 @@ export function setReviewStatus(reviewId, status) {
 export function deleteReview(reviewId) {
   return request.delete('/admin/review/' + reviewId)
 }
+
+/** 封禁/解封用户（status=0 封禁, 1 解封） */
+export function toggleUserStatus(userId, status) {
+  return request.put('/admin/users/' + userId + '/status', null, { params: { status } })
+}

@@ -24,7 +24,7 @@
     <!-- Tab 内容区 -->
     <div class="admin-content">
       <SystemTab v-show="activeTab === 'sys'" />
-      <GoodsAuditTab v-show="activeTab === 'goods'" />
+      <GoodsManageTab v-show="activeTab === 'goods'" />
       <MerchantTab v-show="activeTab === 'merchant'" />
       <ReviewTab v-show="activeTab === 'review'" />
     </div>
@@ -35,7 +35,7 @@
 import { ref } from 'vue'
 import { useUserStore } from '../../stores/user.js'
 import SystemTab from './tabs/SystemTab.vue'
-import GoodsAuditTab from './tabs/GoodsAuditTab.vue'
+import GoodsManageTab from './tabs/GoodsManageTab.vue'
 import MerchantTab from './tabs/MerchantTab.vue'
 import ReviewTab from './tabs/ReviewTab.vue'
 

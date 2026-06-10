@@ -6,7 +6,7 @@
       <nav class="pc-nav">
         <span class="pc-nav-item active">首页</span>
         <span class="pc-nav-item" @click="authGuardThen('/cart')">购物车</span>
-        <span class="pc-nav-item" @click="authGuardThen('/profile')">个人中心</span>
+        <span class="pc-nav-item" @click="authGuardThen('/profile')">我的订单</span>
         <!-- 商家中心下拉 -->
         <div class="merchant-dropdown" @mouseenter="openMerchantDropdown" @mouseleave="merchantOpen = false">
           <span class="pc-nav-item merchant-trigger" :class="{ active: merchantOpen }">
@@ -207,15 +207,16 @@ const userStore = useUserStore()
 
 const isLoggedIn = computed(() => userStore.isLogin)
 const hasAdminPerm = computed(() => {
-  const perms = userStore.permissions
-  if (!Array.isArray(perms) || perms.length === 0) return false
-  const adminKeys = [
-    'sys:user:list', 'sys:user:update', 'sys:role:list',
-    'spu:audit:list', 'spu:audit',
-    'merchant:list', 'merchant:audit', 'merchant:audit:list', 'merchant:audit:info', 'merchant:disable',
-    'review:list', 'review:manage', 'review:delete',
-  ]
-  return adminKeys.some(p => perms.includes(p))
+  const roles = userStore.memberInfo?.roles
+  if (!Array.isArray(roles) || roles.length === 0) return false
+  return roles.some(r => {
+    if (typeof r === 'string') return r === 'ROLE_ADMIN' || r === 'ROLE_OPERATOR'
+    if (r && typeof r === 'object') {
+      const code = r.code || r.name || ''
+      return code === 'ROLE_ADMIN' || code === 'ROLE_OPERATOR'
+    }
+    return false
+  })
 })
 
 /** 鉴权拦截：未登录跳转登录页，登录后 redirect 回原页面 */

@@ -64,3 +64,50 @@ export function verifyCode(phone, code) {
 export function getCurrentUser() {
   return request.get('/auth/me')
 }
+
+/** 获取个人资料 */
+export function getProfile() {
+  return request.get('/profile')
+}
+
+/** 更新个人资料 */
+export function updateProfile(data) {
+  return request.put('/profile', data)
+}
+
+// ── 安全中心 ──
+
+/** 获取安全资料（实名/手机/邮箱状态） */
+export function getSecurityProfile() {
+  return request.get('/auth/profile')
+}
+
+/** 提交实名认证 */
+export function submitRealName(data) {
+  return request.post('/auth/realname', data)
+}
+
+/** 绑定/更换手机 */
+export function bindPhone(data) {
+  return request.put('/auth/phone', data)
+}
+
+/** 发送邮箱验证码 */
+export function sendEmailCode(email) {
+  return request.post('/auth/send-email', null, { params: { email } })
+}
+
+/** 绑定/更换邮箱 */
+export function bindEmail(data) {
+  return request.put('/auth/email', data)
+}
+
+/** 向当前绑定手机号发送验证码（换绑验证） */
+export function sendOldPhoneCode() {
+  return request.post('/auth/send-old-phone-code')
+}
+
+/** 向当前绑定邮箱发送验证码（换绑验证） */
+export function sendOldEmailCode() {
+  return request.post('/auth/send-old-email-code')
+}

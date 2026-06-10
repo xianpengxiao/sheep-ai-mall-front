@@ -33,7 +33,7 @@
           </thead>
           <tbody>
             <tr v-if="merchantList.length === 0"><td :colspan="hasAnyActionPerm ? 7 : 6" class="empty-cell">{{ listFilter.keyword ? '未找到匹配的商家' : '暂无商家数据' }}</td></tr>
-            <tr v-for="row in merchantList" :key="row.id">
+            <tr v-for="row in merchantList" :key="row.id" class="merchant-row" @click="showMerchantDetail(row)">
               <td>
                 <div class="cell-shop">
                   <van-image v-if="row.shopLogo" :src="row.shopLogo" round width="36" height="36" class="shop-logo" />
@@ -141,6 +141,75 @@
 
     <!-- 图片预览 -->
     <van-image-preview v-model:show="previewShow" :images="previewImg ? [previewImg] : []" />
+
+    <!-- ═══════════════════ 商家详情弹窗 ═══════════════════ -->
+    <van-dialog v-model:show="showDetail" title="商家详情" closeable close-icon-position="top-left" class="detail-dialog" :show-confirm-button="false">
+      <div class="detail-body" v-if="detailData">
+        <!-- 店铺基本信息 -->
+        <div class="detail-hd">
+          <van-image v-if="detailData.shopLogo" :src="detailData.shopLogo" round width="48" height="48" class="detail-logo" />
+          <span v-else class="detail-logo-placeholder">{{ (detailData.shopName || '店')[0] }}</span>
+          <div class="detail-hd-info">
+            <div class="detail-shop-name">{{ detailData.shopName }}</div>
+            <div class="detail-shop-status">
+              <span class="status-tag" :class="statusClass(detailData.status)">{{ statusText(detailData.status) }}</span>
+              <span class="shop-status-tag" :class="detailData.shopStatus === 1 ? 'on' : 'off'">{{ detailData.shopStatus === 1 ? '营业中' : '已打烊' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 评分 -->
+        <div class="detail-section">
+          <div class="detail-label">店铺评分</div>
+          <div class="score-row">
+            <div class="score-item">
+              <span class="score-num">{{ detailData.describeScore ?? '--' }}</span>
+              <span class="score-label">描述</span>
+            </div>
+            <div class="score-item">
+              <span class="score-num">{{ detailData.serviceScore ?? '--' }}</span>
+              <span class="score-label">服务</span>
+            </div>
+            <div class="score-item">
+              <span class="score-num">{{ detailData.logisticsScore ?? '--' }}</span>
+              <span class="score-label">物流</span>
+            </div>
+            <div class="score-item">
+              <span class="score-num">{{ detailData.dsrCount ?? 0 }}</span>
+              <span class="score-label">评价数</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 详细信息 -->
+        <div class="detail-section">
+          <div class="detail-label">基本信息</div>
+          <div class="info-grid">
+            <div class="info-row"><span class="info-label">店铺ID</span><span class="info-val">{{ detailData.id }}</span></div>
+            <div class="info-row"><span class="info-label">用户ID</span><span class="info-val">{{ detailData.userId }}</span></div>
+            <div class="info-row"><span class="info-label">店铺描述</span><span class="info-val">{{ detailData.shopDesc || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">店铺公告</span><span class="info-val">{{ detailData.shopNotice || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">营业时间</span><span class="info-val">{{ detailData.businessHours || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">售后信息</span><span class="info-val">{{ detailData.afterSaleInfo || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">经营范围</span><span class="info-val">{{ detailData.businessScope || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">法人信息</span><span class="info-val">{{ detailData.legalPerson || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">经营地址</span><span class="info-val">{{ detailData.businessAddress || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">联系人</span><span class="info-val">{{ detailData.contactName || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">联系电话</span><span class="info-val">{{ detailData.contactPhone || '--' }}</span></div>
+            <div class="info-row"><span class="info-label">联系手机</span><span class="info-val">{{ detailData.verifiedContact || '--' }}</span></div>
+          </div>
+        </div>
+
+        <!-- 营业执照 -->
+        <div class="detail-section" v-if="detailData.businessLicense">
+          <div class="detail-label">营业执照</div>
+          <van-image :src="detailData.businessLicense" width="160" height="100" class="license-preview" @click="doPreview(detailData.businessLicense)" />
+        </div>
+      </div>
+      <div class="detail-body" v-else>
+        <van-loading class="loading-center" size="20" />
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -152,6 +221,7 @@ import {
   getMerchantList, auditMerchantApply, toggleMerchantStatus,
   getPendingShopChanges, auditShopChange,
 } from '../../../api/admin.js'
+import { getMerchantInfo } from '../../../api/merchant.js'
 
 const userStore = useUserStore()
 function hasPerm(p) { return Array.isArray(userStore.permissions) && userStore.permissions.includes(p) }
@@ -351,6 +421,21 @@ const previewShow = ref(false)
 const previewImg = ref('')
 function doPreview(url) { previewImg.value = url; previewShow.value = true }
 
+// ── 商家详情 ──
+const showDetail = ref(false)
+const detailData = ref(null)
+
+async function showMerchantDetail(row) {
+  showDetail.value = true
+  detailData.value = null
+  try {
+    const data = await getMerchantInfo(row.id)
+    detailData.value = data
+  } catch {
+    showToast('加载商家详情失败')
+  }
+}
+
 // Tab 切换懒加载
 watch(activeSub, (val) => {
   if (val === 'change' && changeList.value.length === 0 && !changeLoading.value) loadChanges()
@@ -475,6 +560,32 @@ onMounted(loadMerchantList)
   background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important;
   border: none !important; color: #fff !important;
 }
+
+/* ── 行点击 ── */
+.merchant-row { cursor: pointer; }
+
+/* ── 商家详情弹窗 ── */
+.detail-dialog :deep(.van-dialog__header) { font-weight: 600; font-size: 16px; padding: 16px 20px 0; }
+.detail-body { padding: 16px 20px 20px; max-height: 520px; overflow-y: auto; }
+.detail-hd { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+.detail-logo { flex-shrink: 0; }
+.detail-logo-placeholder {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg,#e8573a 0%,#f39c12 100%);
+  color: #fff; font-size: 18px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.detail-hd-info { flex: 1; min-width: 0; }
+.detail-shop-name { font-size: 16px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+.detail-shop-status { display: flex; gap: 8px; align-items: center; }
+.detail-section { margin-bottom: 16px; }
+.detail-label { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
+.score-row { display: flex; gap: 16px; }
+.score-item { text-align: center; min-width: 56px; padding: 8px 0; background: #faf8f6; border-radius: 8px; flex: 1; }
+.score-num { display: block; font-size: 18px; font-weight: 700; color: #e8573a; }
+.score-label { font-size: 11px; color: #9a9aae; margin-top: 2px; display: block; }
+.info-grid { display: flex; flex-direction: column; gap: 8px; }
+.info-grid .info-row { font-size: 13px; }
 
 /* 变更审核弹窗 */
 .change-dialog :deep(.van-dialog) { width: 500px; }
