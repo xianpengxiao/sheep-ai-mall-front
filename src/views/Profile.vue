@@ -8,13 +8,17 @@
     <div class="user-card">
       <div class="user-avatar-wrap" @click="showAvatarDialog = true">
         <van-image
+          v-if="profile.avatar"
           round
           width="80"
           height="80"
-          :src="profile.avatar || defaultAvatar"
+          :src="profile.avatar"
           class="user-avatar-img"
         />
+        <div v-else class="user-avatar-icon">
+          <van-icon name="user-o" size="36" color="#c8c4c0" />
         </div>
+      </div>
       <div class="user-info" @click="openEdit">
         <div class="user-nickname">{{ profile.nickname || '暂无昵称' }}</div>
         <div class="user-meta-row">
@@ -150,7 +154,6 @@ import PasswordEditor from '../components/PasswordEditor.vue'
 const router = useRouter()
 const userStore = useUserStore()
 
-const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f0ece8' rx='50'/%3E%3Ctext x='50' y='58' text-anchor='middle' font-size='40' fill='%23c8c4c0'%3E👤%3C/text%3E%3C/svg%3E"
 
 // ── 个人资料 ──
 const profile = reactive({

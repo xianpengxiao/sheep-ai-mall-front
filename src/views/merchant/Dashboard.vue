@@ -166,6 +166,11 @@
               <input v-model="goodsKeyword" class="search-input" placeholder="搜索商品名称..." @keyup.enter="handleSearch" />
               <van-icon v-if="goodsKeyword" name="close" size="14" color="#c8c4c0" class="search-clear" @click.stop="clearSearch" />
             </div>
+            <select v-model="goodsStatus" class="status-select" @change="handleStatusChange">
+              <option value="">全部状态</option>
+              <option value="1">上架</option>
+              <option value="0">下架</option>
+            </select>
             <van-button round size="small" class="toolbar-btn" @click="openAddGoods">
               <van-icon name="plus" size="14" /> 新增商品
             </van-button>
@@ -188,6 +193,7 @@
                   <span class="audit-tag" :class="auditTagClass(item.auditStatus)">{{ auditTagText(item.auditStatus) }}</span>
                 </div>
                 <div class="card-audit-msg" v-if="item.auditStatus === 2 && item.auditMsg">驳回原因：{{ item.auditMsg }}</div>
+                <div class="card-audit-hint" v-if="item.auditStatus === 2">请修改商品信息后重新提交审核</div>
                 <div class="card-price">¥{{ item.minPrice ?? '0.00' }}</div>
 
                 <!-- 库存信息区（悬浮展示 SKU 明细） -->
@@ -253,8 +259,14 @@
       </van-dialog>
 
       <!-- 编辑商品弹窗 -->
-      <van-dialog v-model:show="showEditGoods" title="编辑商品" :show-confirm-button="false" closeable close-icon-position="top-left" class="edit-goods-dialog">
-        <GoodsForm ref="editGoodsFormRef" :init-form="editGoodsData" submit-text="保存" @submit="handleEditGoods" />
+      <van-dialog v-model:show="showEditGoods" title="编辑商品" :show-confirm-button="false" closeable close-icon-position="top-left" class="edit-goods-dialog shop-edit-dialog-inner">
+        <div class="edit-dialog-body">
+          <div v-if="editRejectMsg" class="edit-reject-banner">
+            <van-icon name="warn-o" size="16" color="#c62828" />
+            <span>驳回原因：{{ editRejectMsg }}</span>
+          </div>
+          <GoodsForm ref="editGoodsFormRef" :init-form="editGoodsData" submit-text="保存" @submit="handleEditGoods" />
+        </div>
       </van-dialog>
     </div>
 
@@ -485,6 +497,7 @@ import { getOrderDetail, deliverOrder } from '../../api/order.js'
 import { getTree } from '../../api/category.js'
 const router = useRouter()
 const defaultImg = 'https://img.yzcdn.cn/vant/ipad.jpeg'
+
 const defaultLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e8573a' rx='16'/%3E%3Ctext x='50' y='66' text-anchor='middle' font-size='44' fill='%23fff'%3E🏪%3C/text%3E%3C/svg%3E"
 
 const activeTab = ref('goods')
@@ -666,11 +679,13 @@ const goodsFinished = ref(false)
 const goodsPage = ref(1)
 const goodsTotal = ref(0)
 const goodsKeyword = ref('')
+const goodsStatus = ref('')
 const goodsCategoryId = ref(null)
 const showEditGoods = ref(false)
 const editGoodsData = ref({})
 const editGoodsId = ref(null)
 const editGoodsFormRef = ref(null)
+const editRejectMsg = ref('')
 
 /** API 返回的全量商品列表（用于前端分类过滤） */
 const allGoodsCache = ref([])
@@ -703,6 +718,7 @@ async function fetchGoods() {
   try {
     const params = { pageNum: 1, pageSize: 999 }  // 一次拉取足够多，前端做分类过滤
     if (goodsKeyword.value) params.keyword = goodsKeyword.value
+    if (goodsStatus.value !== '') params.status = goodsStatus.value
     const res = await getMerchantGoodsPage(params)
     allGoodsCache.value = res?.records || []
     allGoodsTotal.value = res?.total || 0
@@ -721,6 +737,11 @@ watch(displayGoods, (list) => {
 }, { immediate: true })
 
 function handleSearch() {
+  goodsPage.value = 1
+  fetchGoods()
+}
+
+function handleStatusChange() {
   goodsPage.value = 1
   fetchGoods()
 }
@@ -761,13 +782,14 @@ async function handleAddGoods(payload) {
 
 async function editGoods(item) {
   editGoodsId.value = item.id
+  editRejectMsg.value = item.auditMsg || ''
   try {
     const detail = await getSpuDetail(item.id)
     editGoodsData.value = { ...detail }
+    showEditGoods.value = true
   } catch {
-    editGoodsData.value = { ...item }
+    showToast('商品不存在，无法编辑')
   }
-  showEditGoods.value = true
 }
 
 async function handleEditGoods(payload) {
@@ -1026,6 +1048,9 @@ onActivated(() => {
 .loading-center { padding: 60px 0; }
 .tab-content { padding: 12px 16px 24px; }
 
+
+
+
 /* ── 方案B · 极简信息流 ── */
 .shop-header {
   background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%);
@@ -1272,6 +1297,10 @@ onActivated(() => {
 
 /* ── 工具栏 ── */
 .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.status-select {
+  border: 1.5px solid #e0dcd8; border-radius: 8px; padding: 6px 8px;
+  font-size: 12px; color: #1a1a2e; background: #fff; outline: none;
+}
 .toolbar-btn {
   background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important;
   border: none !important; color: #fff !important; font-weight: 600; padding: 0 16px;
@@ -1402,7 +1431,8 @@ onActivated(() => {
 .audit-tag.audit-pending { background: #fff3e0; color: #f39c12; }
 .audit-tag.audit-passed { background: #e8f8ee; color: #07c160; }
 .audit-tag.audit-reject { background: #fde8e5; color: #e8573a; }
-.card-audit-msg { font-size: 12px; color: #e8573a; margin-bottom: 4px; }
+.card-audit-msg { font-size: 12px; color: #e8573a; margin-bottom: 2px; }
+.card-audit-hint { font-size: 12px; color: #f39c12; font-weight: 500; margin-bottom: 4px; }
 
 /* 库存行 */
 .card-stock-row {
@@ -1568,6 +1598,21 @@ onActivated(() => {
 }
 .scope-checkbox {
   padding: 10px 0;
+}
+
+/* ── 编辑驳回横幅 ── */
+.edit-dialog-body { padding: 16px 20px 24px; display: flex; flex-direction: column; }
+.edit-reject-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  background: #fdecea;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #c62828;
+  font-weight: 500;
 }
 
 /* ── 编辑商品弹窗 ── */

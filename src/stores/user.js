@@ -45,6 +45,8 @@ export const useUserStore = defineStore('user', {
     },
   },
 
-  // pinia-plugin-persistedstate: 自动同步到 localStorage
-  persist: true,
+  // 只持久化 token，memberInfo 每次启动从后端重新获取
+  persist: {
+    pick: ['token'],
+  },
 })

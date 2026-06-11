@@ -30,6 +30,11 @@ export function auditGoods(spuId, auditStatus, auditMsg) {
   return request.put('/admin/spu/audit', body)
 }
 
+/** 审核商品详情 */
+export function getAuditSpuDetail(id) {
+  return request.get('/admin/spu/' + id + '/detail')
+}
+
 // ── 商家管理 ──
 
 /** 商家列表分页 */
@@ -42,6 +47,11 @@ export function auditMerchantApply(id, status, auditRemark) {
   const body = { status }
   if (auditRemark) body.auditRemark = auditRemark
   return request.put('/admin/merchant/apply/' + id + '/audit', body)
+}
+
+/** 入驻申请分页 */
+export function getMerchantApplyPage(params) {
+  return request.get('/admin/merchant/apply/page', { params })
 }
 
 /** 禁用/启用商家（status=1 启用, 2 禁用） */

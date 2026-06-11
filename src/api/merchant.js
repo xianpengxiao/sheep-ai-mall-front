@@ -83,6 +83,11 @@ export function toggleMerchantGoodsStatus(id, status) {
   return request.put(`/merchant/goods/${id}/status`, null, { params: { status } })
 }
 
+/** 查询当前用户的入驻申请状态 */
+export function getMerchantApplyStatus() {
+  return request.get('/merchant/apply/status')
+}
+
 /** AI 生成营销文案 */
 export function generateProductCopy(data) {
   return request.post('/ai/product-copy', data)

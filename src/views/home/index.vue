@@ -21,6 +21,13 @@
                   <div class="drop-desc">{{ applyBtnDesc }}</div>
                 </div>
               </div>
+              <div class="dropdown-item" @click="checkApplyStatus">
+                <span class="drop-icon">📋</span>
+                <div class="drop-text">
+                  <div class="drop-title">入驻状态</div>
+                  <div class="drop-desc">查询入驻申请审核进度</div>
+                </div>
+              </div>
               <div
                 class="dropdown-item"
                 :class="{ disabled: !merchantVerified }"
@@ -48,7 +55,7 @@
               class="nav-avatar"
             />
             <van-icon v-else name="user-o" size="18" />
-            <span class="nav-username">{{ userStore.memberInfo?.realName || userStore.memberInfo?.username || '用户' }}</span>
+            <span class="nav-username">{{ userStore.memberInfo?.nickname || userStore.memberInfo?.realName || userStore.memberInfo?.username || '用户' }}</span>
           </span>
         </template>
         <template v-else>
@@ -195,11 +202,12 @@
 <script setup>
 import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { showToast, showDialog } from 'vant'
 import { useUserStore } from '../../stores/user.js'
 import { getCurrentUser } from '../../api/member.js'
 import { getTree } from '../../api/category.js'
 import { getSpuPage } from '../../api/goods.js'
+import { getMerchantApplyStatus } from '../../api/merchant.js'
 import GoodsCard from '../../components/GoodsCard.vue'
 
 const router = useRouter()
@@ -264,6 +272,28 @@ function goMerchant(target) {
 
 function goMerchantMobile() {
   router.push(merchantVerified.value ? '/merchant/dashboard' : '/merchant/apply')
+}
+
+/** 查询入驻申请状态弹窗 */
+async function checkApplyStatus() {
+  merchantOpen.value = false
+  if (!isLoggedIn.value) {
+    router.push({ name: 'Login', query: { redirect: '/merchant/apply' } })
+    return
+  }
+  try {
+    const data = await getMerchantApplyStatus()
+    if (!data) {
+      showDialog({ title: '提示', message: '暂无入驻申请记录', confirmButtonColor: '#e8573a' })
+      return
+    }
+    const statusMap = { 0: '审核中', 1: '已通过', 2: '已驳回' }
+    const rejectHint = data.status === 2 ? '\n\n您的入驻申请已被驳回，请修改资料后重新提交申请。' : ''
+    const msg = `店铺名称：${data.shopName}\n审核状态：${statusMap[data.status] || '未知'}${data.auditRemark ? '\n驳回原因：' + data.auditRemark : ''}${rejectHint}`
+    showDialog({ title: '入驻申请状态', message: msg, confirmButtonColor: '#e8573a' })
+  } catch {
+    showDialog({ title: '提示', message: '暂无入驻申请记录', confirmButtonColor: '#e8573a' })
+  }
 }
 
 /** 移动端商家图标点击：鉴权 + 商家校验 → 入驻页或店铺 */

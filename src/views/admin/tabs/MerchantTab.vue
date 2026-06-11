@@ -11,7 +11,6 @@
       <div class="filter-bar">
         <select v-model="listFilter.status" class="filter-select" @change="searchList">
           <option value="">全部</option>
-          <option value="0">待审核</option>
           <option value="1">已开通</option>
           <option value="2">已关闭</option>
         </select>
@@ -47,12 +46,10 @@
               <td><span class="shop-status-tag" :class="row.shopStatus === 1 ? 'on' : 'off'">{{ row.shopStatus === 1 ? '营业中' : '已打烊' }}</span></td>
               <td class="cell-time">{{ row.createTime ? fmt(row.createTime) : '--' }}</td>
               <td v-if="hasAnyActionPerm" class="cell-actions">
-                <!-- 待审核 → 入驻审核 -->
-                <van-button v-if="row.status === 0 && hasPerm('merchant:audit')" size="small" plain round class="btn-primary" @click="openApplyAudit(row)">入驻审核</van-button>
                 <!-- 已开通 → 禁用 -->
-                <van-button v-if="row.status === 1 && hasPerm('merchant:disable')" size="small" plain round class="btn-danger" @click="handleToggle(row)">禁用</van-button>
+                <van-button v-if="row.status === 1 && hasPerm('merchant:disable')" size="small" plain round class="btn-danger" @click.stop="handleToggle(row)">禁用</van-button>
                 <!-- 已关闭 → 启用 -->
-                <van-button v-if="row.status === 2 && hasPerm('merchant:disable')" size="small" plain round class="btn-success" @click="handleToggle(row)">启用</van-button>
+                <van-button v-if="row.status === 2 && hasPerm('merchant:disable')" size="small" plain round class="btn-success" @click.stop="handleToggle(row)">启用</van-button>
               </td>
             </tr>
           </tbody>
@@ -61,6 +58,59 @@
       <div class="pagination-bar" v-if="merchantTotal > 0">
         <van-pagination v-model="listPage" :page-count="listPageCount" mode="simple" @change="loadMerchantList" />
         <span class="page-info">共 {{ merchantTotal }} 条</span>
+      </div>
+    </div>
+
+    <!-- ═══════════════════ 入驻审核 ═══════════════════ -->
+    <div v-show="activeSub === 'apply'">
+      <!-- 筛选栏 -->
+      <div class="filter-bar">
+        <select v-model="applyFilter.status" class="filter-select" @change="searchApply">
+          <option value="0">待审核</option>
+          <option value="1">已通过</option>
+          <option value="2">已驳回</option>
+        </select>
+        <div class="filter-search">
+          <van-icon name="search" size="14" color="#c8c4c0" />
+          <input v-model="applyFilter.keyword" placeholder="搜索店铺名/联系人/手机号" @input="onApplySearchInput" />
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <van-loading v-if="applyLoading" class="loading-center" size="24" />
+        <table v-else class="data-table">
+          <thead>
+            <tr>
+              <th>店铺名称</th><th>申请人</th><th>联系人</th><th>联系电话</th><th>经营范围</th><th>状态</th><th>驳回原因</th><th>创建时间</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="applyList.length === 0"><td colspan="9" class="empty-cell">{{ applyFilter.keyword ? '未找到匹配的申请' : '暂无入驻申请' }}</td></tr>
+            <tr v-for="row in applyList" :key="row.id">
+              <td>
+                <div class="cell-shop">
+                  <span class="shop-name">{{ row.shopName || '--' }}</span>
+                </div>
+              </td>
+              <td>{{ row.username || '--' }}</td>
+              <td>{{ row.contactName || '--' }}</td>
+              <td>{{ row.contactPhone || '--' }}</td>
+              <td>{{ row.businessScope || '--' }}</td>
+              <td><span class="status-tag" :class="applyStatusClass(row.status)">{{ applyStatusText(row.status) }}</span></td>
+              <td>{{ row.auditRemark || '--' }}</td>
+              <td class="cell-time">{{ row.createTime ? fmt(row.createTime) : '--' }}</td>
+              <td class="cell-actions">
+                <template v-if="row.status === 0">
+                  <van-button size="small" plain round class="btn-primary" @click.stop="openApplyAudit(row)">审核</van-button>
+                </template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination-bar" v-if="applyTotal > 0">
+        <van-pagination v-model="applyPage" :page-count="applyPageCount" mode="simple" @change="loadApplyList" />
+        <span class="page-info">共 {{ applyTotal }} 条</span>
       </div>
     </div>
 
@@ -77,7 +127,7 @@
             <tr v-for="item in changeList" :key="item.id">
               <td>{{ item.shopName || '--' }}</td>
               <td>
-                <span v-for="(f, i) in parseFields(item.changedFields)" :key="i" class="field-badge">{{ f }}</span>
+                <span v-for="(f, i) in parseFields(item.changedFields)" :key="i" class="field-badge">{{ fieldLabel(f) }}</span>
               </td>
               <td class="cell-time">{{ item.createTime ? fmt(item.createTime) : '--' }}</td>
               <td class="cell-actions">
@@ -98,17 +148,28 @@
       <div class="audit-body" v-if="applyTarget">
         <div class="audit-info-grid">
           <div class="info-row"><span class="info-label">店铺名称</span><span class="info-val">{{ applyTarget.shopName }}</span></div>
-          <div class="info-row"><span class="info-label">联系人</span><span class="info-val">{{ applyTarget.contactName }}</span></div>
-          <div class="info-row"><span class="info-label">联系电话</span><span class="info-val">{{ applyTarget.contactPhone }}</span></div>
+          <div class="info-row"><span class="info-label">申请人</span><span class="info-val">{{ applyTarget.username || '--' }}</span></div>
+          <div class="info-row"><span class="info-label">联系人</span><span class="info-val">{{ applyTarget.contactName || '--' }}</span></div>
+          <div class="info-row"><span class="info-label">联系电话</span><span class="info-val">{{ applyTarget.contactPhone || '--' }}</span></div>
           <div class="info-row"><span class="info-label">经营范围</span><span class="info-val">{{ applyTarget.businessScope || '--' }}</span></div>
+          <div class="info-row"><span class="info-label">法人信息</span><span class="info-val">{{ applyTarget.legalPerson || '--' }}</span></div>
+          <div class="info-row"><span class="info-label">经营地址</span><span class="info-val">{{ applyTarget.businessAddress || '--' }}</span></div>
           <div class="info-row" v-if="applyTarget.businessLicense">
             <span class="info-label">营业执照</span>
-            <van-image :src="applyTarget.businessLicense" width="120" height="80" class="license-preview" @click="doPreview(applyTarget.businessLicense)" />
+            <van-image :src="applyTarget.businessLicense" width="160" height="100" class="license-preview" @click="doPreview(applyTarget.businessLicense)" />
+          </div>
+          <div class="info-row" v-if="applyTarget.foodLicense">
+            <span class="info-label">食品许可证</span>
+            <van-image :src="applyTarget.foodLicense" width="160" height="100" class="license-preview" @click="doPreview(applyTarget.foodLicense)" />
+          </div>
+          <div class="info-row" v-if="applyTarget.auditRemark">
+            <span class="info-label">驳回原因</span>
+            <span class="info-val" style="color:#c62828">{{ applyTarget.auditRemark }}</span>
           </div>
         </div>
         <div class="audit-actions">
-          <van-button round plain class="audit-btn" @click="openApplyReject">驳回</van-button>
-          <van-button round class="audit-btn audit-btn-primary" @click="handleApplyApprove">通过入驻</van-button>
+          <van-button v-if="applyTarget?.status === 0" round plain class="audit-btn" @click="openApplyReject">驳回</van-button>
+          <van-button v-if="applyTarget?.status === 0" round class="audit-btn audit-btn-primary" @click="handleApplyApprove">通过入驻</van-button>
         </div>
       </div>
     </van-dialog>
@@ -124,7 +185,19 @@
         <div class="change-fields">
           <div class="change-field" v-for="f in changeFieldList" :key="f.key">
             <div class="change-field-label">{{ f.label }}</div>
-            <div class="change-field-new">新值：<template v-if="f.isImg"><van-image :src="f.newVal" width="100" height="70" class="license-preview" @click="doPreview(f.newVal)" /></template><template v-else>{{ f.newVal || '--' }}</template></div>
+            <div class="change-compare">
+              <div class="change-old">
+                旧值：
+                <van-image v-if="f.isImg && f.oldVal" :src="f.oldVal" width="80" height="56" class="license-preview" @click="doPreview(f.oldVal)" />
+                <span v-else>{{ f.isImg ? '--' : (f.oldVal ?? '--') }}</span>
+              </div>
+              <van-icon name="arrow" size="14" color="#e8573a" class="change-arrow" />
+              <div class="change-new">
+                新值：
+                <van-image v-if="f.isImg" :src="f.newVal" width="80" height="56" class="license-preview" @click="doPreview(f.newVal)" />
+                <span v-else>{{ f.newVal || '--' }}</span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="audit-actions">
@@ -215,10 +288,10 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { showToast, showConfirmDialog } from 'vant'
+import { showToast, showConfirmDialog, showDialog } from 'vant'
 import { useUserStore } from '../../../stores/user.js'
 import {
-  getMerchantList, auditMerchantApply, toggleMerchantStatus,
+  getMerchantList, getMerchantApplyPage, auditMerchantApply, toggleMerchantStatus,
   getPendingShopChanges, auditShopChange,
 } from '../../../api/admin.js'
 import { getMerchantInfo } from '../../../api/merchant.js'
@@ -229,6 +302,7 @@ const hasAnyActionPerm = computed(() => hasPerm('merchant:audit') || hasPerm('me
 
 const subTabs = [
   { key: 'list', label: '商家列表' },
+  { key: 'apply', label: '入驻审核' },
   { key: 'change', label: '信息变更审核' },
 ]
 const activeSub = ref('list')
@@ -286,6 +360,45 @@ async function handleToggle(row) {
   } catch { /* cancelled */ }
 }
 
+// ══════ 入驻申请列表 ══════
+
+const applyFilter = ref({ status: '0', keyword: '' })
+const applyList = ref([])
+const applyLoading = ref(false)
+const applyPage = ref(1)
+const applyTotal = ref(0)
+const applyPageCount = computed(() => Math.ceil(applyTotal.value / size) || 1)
+let applySearchTimer = null
+
+function onApplySearchInput() {
+  clearTimeout(applySearchTimer)
+  applySearchTimer = setTimeout(() => { applyPage.value = 1; loadApplyList() }, 300)
+}
+function searchApply() { applyPage.value = 1; loadApplyList() }
+
+async function loadApplyList() {
+  applyLoading.value = true
+  try {
+    const params = { pageNum: applyPage.value, pageSize: size, status: applyFilter.value.status }
+    if (applyFilter.value.keyword) params.keyword = applyFilter.value.keyword
+    const data = await getMerchantApplyPage(params)
+    applyList.value = data?.records || []
+    applyTotal.value = data?.total || 0
+  } catch { showToast('加载失败') }
+  finally { applyLoading.value = false }
+}
+
+function applyStatusClass(s) {
+  if (s === 0) return 'pending'
+  if (s === 1) return 'on'
+  return 'off'
+}
+function applyStatusText(s) {
+  if (s === 0) return '待审核'
+  if (s === 1) return '已通过'
+  return '已驳回'
+}
+
 // ── 入驻审核 ──
 const showApplyAudit = ref(false)
 const applyTarget = ref(null)
@@ -328,8 +441,8 @@ async function confirmApplyReject() {
 }
 
 function afterApplyDone(item) {
-  merchantList.value = merchantList.value.filter(i => i.id !== item.id)
-  if (merchantList.value.length === 0 && listPage.value > 1) { listPage.value--; loadMerchantList() }
+  applyList.value = applyList.value.filter(i => i.id !== item.id)
+  if (applyList.value.length === 0 && applyPage.value > 1) { applyPage.value--; loadApplyList() }
 }
 
 // ══════ 信息变更审核 ══════
@@ -364,22 +477,38 @@ const fieldLabelMap = {
   contactPhone: '联系电话',
   businessLicense: '营业执照',
   foodLicense: '食品许可证',
+  shopLogo: '店铺 Logo',
+  shopName: '店铺名称',
+  shopDesc: '店铺描述',
+  shopNotice: '店铺公告',
+  businessHours: '营业时间',
+  afterSaleInfo: '售后信息',
+  businessScope: '经营范围',
+  verifiedContact: '联系手机',
 }
+function fieldLabel(key) { return fieldLabelMap[key] || key }
 
 // ── 变更审核弹窗 ──
 const showChangeAudit = ref(false)
 const changeTarget = ref(null)
 const changeFieldList = ref([])
 
-function openChangeAudit(item) {
+async function openChangeAudit(item) {
   changeTarget.value = item
+  showChangeAudit.value = true
+  changeFieldList.value = []
+  // 获取商家当前信息作为旧值对照
+  let oldData = {}
+  try {
+    const info = await getMerchantInfo(item.merchantId)
+    oldData = info || {}
+  } catch { /* 静默 */ }
   const fields = parseFields(item.changedFields)
   changeFieldList.value = fields.map(f => {
     const label = fieldLabelMap[f] || f
     const isImg = f === 'businessLicense' || f === 'foodLicense'
-    return { key: f, label, newVal: item[f], isImg }
+    return { key: f, label, oldVal: oldData[f], newVal: item[f], isImg }
   })
-  showChangeAudit.value = true
 }
 
 async function handleChangeApprove() {
@@ -438,6 +567,7 @@ async function showMerchantDetail(row) {
 
 // Tab 切换懒加载
 watch(activeSub, (val) => {
+  if (val === 'apply' && applyList.value.length === 0 && !applyLoading.value) loadApplyList()
   if (val === 'change' && changeList.value.length === 0 && !changeLoading.value) loadChanges()
 })
 
@@ -560,6 +690,9 @@ onMounted(loadMerchantList)
   background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important;
   border: none !important; color: #fff !important;
 }
+.audit-btn-danger {
+  border-color: #c62828 !important; color: #c62828 !important;
+}
 
 /* ── 行点击 ── */
 .merchant-row { cursor: pointer; }
@@ -593,4 +726,8 @@ onMounted(loadMerchantList)
 .change-field { padding: 10px; background: #faf8f6; border-radius: 8px; }
 .change-field-label { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
 .change-field-new { font-size: 13px; color: #5a5a6e; }
+.change-compare { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
+.change-old { flex: 1; color: #9a9aae; text-decoration: line-through; }
+.change-new { flex: 1; color: #2e7d32; font-weight: 500; }
+.change-arrow { flex-shrink: 0; margin-top: 2px; }
 </style>

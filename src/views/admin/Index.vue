@@ -1,16 +1,8 @@
 <template>
   <div class="page-admin">
-    <!-- 顶部导航，与首页风格一致 -->
-    <div class="admin-topbar">
-      <div class="admin-brand">SheepAI Mall</div>
-      <div class="admin-user">
-        <span class="admin-user-name">{{ userStore.memberInfo?.realName || userStore.memberInfo?.username || '管理员' }}</span>
-        <van-image v-if="userStore.memberInfo?.avatar" :src="userStore.memberInfo.avatar" round width="30" height="30" />
-        <van-icon v-else name="user-o" size="18" />
-      </div>
-    </div>
+    <NavBar title="管理中心" />
 
-    <!-- Tab 导航栏（与首页 nav-item 风格一致） -->
+    <!-- Tab 导航栏 -->
     <div class="admin-tab-bar">
       <span
         v-for="tab in tabs"
@@ -23,23 +15,22 @@
 
     <!-- Tab 内容区 -->
     <div class="admin-content">
-      <SystemTab v-show="activeTab === 'sys'" />
-      <GoodsManageTab v-show="activeTab === 'goods'" />
-      <MerchantTab v-show="activeTab === 'merchant'" />
-      <ReviewTab v-show="activeTab === 'review'" />
+      <SystemTab v-if="activeTab === 'sys'" />
+      <GoodsManageTab v-if="activeTab === 'goods'" />
+      <MerchantTab v-if="activeTab === 'merchant'" />
+      <ReviewTab v-if="activeTab === 'review'" />
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { useUserStore } from '../../stores/user.js'
+import NavBar from '../../components/NavBar.vue'
 import SystemTab from './tabs/SystemTab.vue'
 import GoodsManageTab from './tabs/GoodsManageTab.vue'
 import MerchantTab from './tabs/MerchantTab.vue'
 import ReviewTab from './tabs/ReviewTab.vue'
 
-const userStore = useUserStore()
 const activeTab = ref('sys')
 
 const tabs = [
@@ -54,35 +45,6 @@ const tabs = [
 .page-admin {
   min-height: 100vh;
   background: #f5f3f0;
-}
-
-/* ── 顶部栏 ── */
-.admin-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 24px;
-  background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-.admin-brand {
-  font-family: 'DM Sans', 'Inter', system-ui, sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.8px;
-  background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.admin-user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #5a5a6e;
 }
 
 /* ── Tab 栏 ── */
