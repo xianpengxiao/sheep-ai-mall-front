@@ -111,3 +111,20 @@ export function sendOldPhoneCode() {
 export function sendOldEmailCode() {
   return request.post('/auth/send-old-email-code')
 }
+
+// ── 忘记密码 ──
+
+/** 检查邮箱是否已绑定 */
+export function checkEmail(email) {
+  return request.get('/auth/check-email', { params: { email } })
+}
+
+/** 校验邮箱验证码 */
+export function verifyEmailCode(email, code) {
+  return request.post('/auth/verify-email-code', { email, code })
+}
+
+/** 重置密码（手机或邮箱） */
+export function resetPassword(data) {
+  return request.post('/auth/reset-password', data)
+}

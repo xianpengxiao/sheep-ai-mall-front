@@ -579,11 +579,11 @@ function merchantStarClass(pos, score) {
 }
 
 function goToShop() {
-  const name = merchantInfo.value?.shopName || spu.value?.shopName
-  if (name) {
-    router.push({ path: '/search', query: { keyword: name } })
+  const mid = merchantInfo.value?.id || spu.value?.merchantId
+  if (mid) {
+    router.push(`/shop/${mid}`)
   } else {
-    showToast('店铺主页开发中')
+    showToast('店铺信息获取中')
   }
 }
 

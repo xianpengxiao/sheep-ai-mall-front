@@ -97,3 +97,15 @@ export function generateProductCopy(data) {
 export function saveProductCopy(data) {
   return request.post('/ai/product-copy/save', data)
 }
+
+// ── 公开店铺页 ──
+
+/** 查询店铺商品列表（买家端公开） */
+export function getMerchantGoods(merId, params) {
+  return request.get(`/merchant/${merId}/goods`, { params })
+}
+
+/** 查询店铺评价列表（买家端公开，可按 rating 过滤） */
+export function getMerchantReviews(merId, params) {
+  return request.get(`/merchant/${merId}/reviews`, { params })
+}

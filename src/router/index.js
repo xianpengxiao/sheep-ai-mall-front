@@ -21,6 +21,12 @@ const routes = [
     meta: { title: '注册' },
   },
   {
+    path: '/forgot',
+    name: 'Forgot',
+    component: () => import('../views/login/forgot.vue'),
+    meta: { title: '忘记密码' },
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('../views/Profile.vue'),
@@ -67,6 +73,12 @@ const routes = [
     name: 'GoodsDetail',
     component: () => import('../views/GoodsDetail.vue'),
     meta: { title: '商品详情' },
+  },
+  {
+    path: '/shop/:id',
+    name: 'Shop',
+    component: () => import('../views/shop/Index.vue'),
+    meta: { title: '店铺' },
   },
   {
     path: '/search',
