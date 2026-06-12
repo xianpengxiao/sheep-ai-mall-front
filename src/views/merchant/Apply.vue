@@ -48,16 +48,16 @@
         <input ref="fileInputRef" type="file" accept="image/*" class="file-hidden" @change="onFileSelected" />
       </div>
       <van-field
-        v-model="form.businessScope"
+        v-model="form.businessScopeName"
         is-link
         readonly
         label="经营范围"
         placeholder="请选择经营范围"
         :rules="[{ required: true, message: '请选择经营范围' }]"
-        @click="openScopePicker"
+        @click="showScopePicker = true"
       />
       <!-- 经营范围多选 -->
-      <van-popup v-model:show="showScopePicker" round position="bottom" class="scope-popup">
+      <van-popup v-model:show="showScopePicker" round position="bottom" class="scope-popup" @open="initScopeSelected">
         <div class="scope-popup-header">
           <span class="scope-cancel" @click="showScopePicker = false">取消</span>
           <span class="scope-title">选择经营范围</span>
@@ -143,7 +143,7 @@ function flattenTree(nodes, depth = 0) {
   const result = []
   for (const node of nodes) {
     const prefix = depth > 0 ? '　'.repeat(depth) : ''
-    result.push({ text: prefix + node.name, value: node.name })
+    result.push({ text: prefix + node.name, value: String(node.id) })
     if (node.children?.length) result.push(...flattenTree(node.children, depth + 1))
   }
   return result
@@ -171,12 +171,15 @@ onMounted(async () => {
 })
 
 function onScopeConfirm() {
-  form.businessScope = scopeSelected.value.join('、')
+  form.businessScope = scopeSelected.value.map(String).join(',')
+  form.businessScopeName = scopeSelected.value.map(id => {
+    return categoryOptions.value.find(c => String(c.value) === String(id))?.text || id
+  }).join('、')
   showScopePicker.value = false
 }
 
 function openScopePicker() {
-  scopeSelected.value = form.businessScope ? form.businessScope.split('、') : []
+  scopeSelected.value = form.businessScope ? form.businessScope.split(',').filter(Boolean) : []
   showScopePicker.value = true
 }
 
@@ -184,7 +187,7 @@ const loading = ref(false)
 const form = reactive({
   shopName: '',
   businessLicense: '',
-  businessScope: '',
+  businessScope: '', businessScopeName: '',
   contactName: '',
   contactPhone: '',
   foodLicense: '',
@@ -235,8 +238,9 @@ async function handleSubmit() {
       form.foodLicense = foodUrl
     }
 
-    // 3. 提交申请单
-    await merchantApply(form)
+    // 3. 提交申请单（只传业务字段，不含 businessScopeName）
+    const { businessScopeName, ...payload } = form
+    await merchantApply(payload)
     showToast('申请已提交，请等待审核')
     router.replace('/')
   } catch { /* toast 由拦截器处理 */ }

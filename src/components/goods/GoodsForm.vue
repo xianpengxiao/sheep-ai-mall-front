@@ -145,7 +145,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue'
 import { showToast } from 'vant'
-import { uploadImage, generateProductCopy, saveProductCopy } from '../../api/merchant.js'
+import { uploadImage, generateProductCopy, saveProductCopy, getMyCategories } from '../../api/merchant.js'
 import { getTree } from '../../api/category.js'
 
 const props = defineProps({
@@ -211,13 +211,21 @@ function flattenTree(nodes, depth = 0) {
   const result = []
   for (const node of nodes) {
     const prefix = '  '.repeat(depth)
-    result.push({ text: prefix + node.name, value: node.id })
+    result.push({ text: prefix + node.name, value: String(node.id) })
     if (node.children?.length) result.push(...flattenTree(node.children, depth + 1))
   }
   return result
 }
 
 onMounted(async () => {
+  try {
+    // 优先使用商家经营分类 API（仅返回店铺拥有的分类）
+    const cats = await getMyCategories()
+    if (cats?.length) {
+      categoryOptions.value = flattenTree(cats)
+      return
+    }
+  } catch { /* fallback 到全部分类 */ }
   try {
     const tree = await getTree()
     categoryOptions.value = flattenTree(tree || [])

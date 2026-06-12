@@ -22,7 +22,10 @@
             <span class="sh-tag" v-if="shopInfo.afterSaleInfo">{{ shopInfo.afterSaleInfo }}</span>
           </div>
           <div class="sh-meta">{{ shopInfo.contactPhone || shopInfo.contactName }}</div>
-          <div class="sh-scope">{{ shopInfo.businessScope?.split('、').join(' · ') || '未设置经营范围' }}</div>
+          <div class="sh-scope-row">
+            <span class="sh-scope">{{ scopeDisplayText || '未设置经营范围' }}</span>
+            <van-button size="mini" round plain class="modify-btn-shop" @click="openScopeDirectly">修改</van-button>
+          </div>
         </div>
         <div class="sh-actions">
           <div class="sh-edit" @click="openShopDetail">
@@ -65,68 +68,81 @@
     <!-- 店铺信息编辑弹窗 -->
     <van-dialog v-model:show="showShopDetail" title="编辑店铺信息" :show-confirm-button="false" closeable close-icon-position="top-left" class="shop-edit-dialog">
       <div class="dialog-body shop-edit-body">
-        <!-- 图片上传区 -->
-        <div class="upload-row">
-          <div class="upload-col">
-            <div class="upload-label">店铺 Logo</div>
-            <div class="upload-box logo-box" @click="logoInputRef?.click()">
-              <img v-if="shopForm.logoPreview" :src="shopForm.logoPreview" class="upload-preview" />
-              <img v-else :src="shopInfo?.shopLogo || defaultLogo" class="upload-preview" />
-              <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
+        <!-- 板块1：直接编辑（无需审核） -->
+        <div class="edit-section">
+          <div class="edit-section-title">直接编辑</div>
+          <div class="upload-row">
+            <div class="upload-col">
+              <div class="upload-label">店铺头像</div>
+              <div class="upload-box logo-box" @click="logoInputRef?.click()">
+                <img v-if="shopForm.logoPreview" :src="shopForm.logoPreview" class="upload-preview" />
+                <img v-else :src="shopInfo?.shopLogo || defaultLogo" class="upload-preview" />
+                <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
+              </div>
             </div>
           </div>
-          <div class="upload-col">
-            <div class="upload-label">营业执照 <span class="required">*</span><span class="audit-hint">需审核</span></div>
-            <div class="upload-box cert-box" @click="licenseInputRef?.click()">
-              <img v-if="shopForm.licensePreview" :src="shopForm.licensePreview" class="upload-preview" />
-              <img v-else :src="shopInfo?.businessLicense" class="upload-preview" style="object-fit: contain;" />
-              <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
-            </div>
-          </div>
-          <div class="upload-col">
-            <div class="upload-label">食品许可证 <span class="optional">可选</span><span class="audit-hint">需审核</span></div>
-            <div class="upload-box cert-box" @click="foodLicenseInputRef?.click()">
-              <img v-if="shopForm.foodLicensePreview" :src="shopForm.foodLicensePreview" class="upload-preview" />
-              <img v-else-if="shopInfo?.foodLicense" :src="shopInfo?.foodLicense" class="upload-preview" style="object-fit: contain;" />
-              <div v-else class="upload-placeholder"><van-icon name="plus" size="24" color="#c8c4c0" /></div>
-              <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
-            </div>
-          </div>
+          <input ref="logoInputRef" type="file" accept="image/*" class="file-hidden" @change="onLogoSelected" />
+          <van-field v-model="shopForm.shopName" label="店铺名称" placeholder="请输入店铺名称" maxlength="50" :rules="[{ required: true, message: '请输入店铺名称' }]" />
+          <van-field v-model="shopForm.businessHours" label="营业时间段" placeholder="如：09:00-22:00" />
+          <van-field v-model="shopForm.shopDesc" label="店铺简介" type="textarea" placeholder="请输入店铺简介" :rows="3" autosize />
+          <van-field v-model="shopForm.afterSaleInfo" label="售后说明" type="textarea" placeholder="请输入售后说明" :rows="2" autosize />
+          <van-field v-model="shopForm.shopNotice" label="店铺公告" type="textarea" placeholder="请输入店铺公告" :rows="2" autosize />
+
+        <van-button round block class="dialog-btn dialog-btn-basic" @click="handleSaveBasic" :loading="basicSaving">保存</van-button>
         </div>
-        <input ref="logoInputRef" type="file" accept="image/*" class="file-hidden" @change="onLogoSelected" />
-        <input ref="licenseInputRef" type="file" accept="image/*" class="file-hidden" @change="onLicenseSelected" />
-        <input ref="foodLicenseInputRef" type="file" accept="image/*" class="file-hidden" @change="onFoodLicenseSelected" />
 
-        <!-- 表单字段 -->
-        <van-field v-model="shopForm.shopName" label="店铺名称" placeholder="请输入店铺名称" maxlength="50" :rules="[{ required: true, message: '请输入店铺名称' }]" />
-        <van-field v-model="shopForm.businessScope" is-link readonly label="经营范围" placeholder="请选择经营范围" :rules="[{ required: true, message: '请选择经营范围' }]" @click="openScopePicker" />
-        <van-field v-model="shopForm.contactName" label="联系人" placeholder="请输入联系人姓名" />
-        <van-field v-model="shopForm.contactPhone" label="联系电话" type="tel" placeholder="请输入联系电话" maxlength="11" :rules="[{ pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'onBlur' }]" />
-
-        <van-field v-model="shopForm.shopDesc" label="店铺简介" type="textarea" placeholder="请输入店铺简介" :rows="3" autosize />
-        <van-field v-model="shopForm.shopNotice" label="店铺公告" type="textarea" placeholder="请输入店铺公告" :rows="2" autosize />
-        <van-field v-model="shopForm.businessHours" label="营业时间" placeholder="如：09:00-22:00" />
-        <van-field v-model="shopForm.afterSaleInfo" label="售后说明" type="textarea" placeholder="请输入售后说明" :rows="2" autosize />
-
-        <van-field v-model="shopForm.legalPerson" label="法人信息" placeholder="选填，输入法人姓名" />
-        <van-field v-model="shopForm.businessAddress" label="经营地址" placeholder="选填，输入经营地址" />
-
-        <van-button round block class="dialog-btn" @click="handleSaveShop" :loading="shopSaving">保存</van-button>
+        <!-- 板块2：需提交审核 -->
+        <div class="edit-section">
+          <div class="edit-section-title">需提交审核</div>
+          <div class="upload-row">
+            <div class="upload-col">
+              <div class="upload-label">营业执照 <span class="required">*</span></div>
+              <div class="upload-box cert-box" @click="licenseInputRef?.click()">
+                <img v-if="shopForm.licensePreview" :src="shopForm.licensePreview" class="upload-preview" />
+                <img v-else :src="shopInfo?.businessLicense" class="upload-preview" style="object-fit: contain;" />
+                <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
+              </div>
+            </div>
+            <div class="upload-col">
+              <div class="upload-label">食品许可证 <span class="optional">可选</span></div>
+              <div class="upload-box cert-box" @click="foodLicenseInputRef?.click()">
+                <img v-if="shopForm.foodLicensePreview" :src="shopForm.foodLicensePreview" class="upload-preview" />
+                <img v-else-if="shopInfo?.foodLicense" :src="shopInfo?.foodLicense" class="upload-preview" style="object-fit: contain;" />
+                <div v-else class="upload-placeholder"><van-icon name="plus" size="24" color="#c8c4c0" /></div>
+                <div class="upload-overlay"><van-icon name="camera-o" size="18" color="#fff" /></div>
+              </div>
+            </div>
+          </div>
+          <input ref="licenseInputRef" type="file" accept="image/*" class="file-hidden" @change="onLicenseSelected" />
+          <input ref="foodLicenseInputRef" type="file" accept="image/*" class="file-hidden" @change="onFoodLicenseSelected" />
+          <van-field v-model="shopForm.contactName" label="联系人" placeholder="请输入联系人姓名" />
+          <van-field v-model="shopForm.contactPhone" label="联系手机号" type="tel" placeholder="请输入联系电话" maxlength="11" :rules="[{ required: true, message: '请输入手机号', trigger: 'onBlur' }, { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'onBlur' }]" />
+          <van-field v-model="shopForm.businessScopeName" readonly label="主营分类" placeholder="请选择主营分类" :rules="[{ required: true, message: '请选择主营分类' }]">
+            <template #button>
+              <van-button size="small" round plain class="modify-btn" @click="showScopePicker = true">修改</van-button>
+            </template>
+          </van-field>
+          <van-field v-model="shopForm.legalPerson" label="法人信息" placeholder="请输入法人姓名" :rules="[{ required: true, message: '请输入法人信息' }]" />
+          <van-field v-model="shopForm.businessAddress" label="经营地址" placeholder="请输入经营地址" :rules="[{ required: true, message: '请输入经营地址' }]" />
+          <van-field v-model="shopForm.verifiedContact" label="实名认证" placeholder="请输入实名认证信息" />
+          <van-button round block class="dialog-btn dialog-btn-audit" @click="handleSaveAudit" :loading="auditSaving">提交审核申请</van-button>
+        </div>
       </div>
 
-      <!-- 经营范围多选 -->
-      <van-popup v-model:show="showScopePicker" round position="bottom" class="scope-popup">
+      <!-- 经营范围多选：居中弹窗在编辑窗内 -->
+      <van-popup v-model:show="showScopePicker" round class="scope-popup scope-popup-inner" @open="onScopeOpen">
         <div class="scope-popup-header">
           <span class="scope-cancel" @click="showScopePicker = false">取消</span>
           <span class="scope-title">选择经营范围</span>
           <span class="scope-confirm" @click="onScopeConfirm">确定</span>
         </div>
         <div class="scope-list">
-          <van-checkbox-group v-model="scopeSelected" direction="vertical">
-            <van-checkbox v-for="opt in categoryOptions" :key="opt.value" :name="opt.value" shape="square" class="scope-checkbox">
-              {{ opt.text }}
-            </van-checkbox>
+          <van-checkbox-group v-model="scopeSelected">
+            <div v-for="opt in flatScopeOptions" :key="opt.value" class="scope-checkbox-row">
+              <van-checkbox :name="opt.value" shape="square" class="scope-checkbox-item">{{ opt.text }}</van-checkbox>
+            </div>
           </van-checkbox-group>
+          <van-empty v-if="flatScopeOptions.length === 0" description="暂无分类" />
         </div>
       </van-popup>
     </van-dialog>
@@ -487,13 +503,14 @@
 
 <script setup>
 import { ref, reactive, watch, computed, onActivated, onMounted } from 'vue'
-import { showToast, showConfirmDialog } from 'vant'
+import { showToast, showConfirmDialog, showDialog } from 'vant'
 import { useRouter } from 'vue-router'
 import NavBar from '../../components/NavBar.vue'
 import GoodsForm from '../../components/goods/GoodsForm.vue'
 import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage, getDsrTrend, updateShopStatus, publishGoods, toggleMerchantGoodsStatus } from '../../api/merchant.js'
 import { getSpuDetail, deleteSpu } from '../../api/goods.js'
 import { getOrderDetail, deliverOrder } from '../../api/order.js'
+import { getMyCategories } from '../../api/merchant.js'
 import { getTree } from '../../api/category.js'
 const router = useRouter()
 const defaultImg = 'https://img.yzcdn.cn/vant/ipad.jpeg'
@@ -504,52 +521,130 @@ const activeTab = ref('goods')
 
 // 经营范围选择
 const showScopePicker = ref(false)
-const categoryOptions = ref([])
+const scopeTreeData = ref([])
 const scopeSelected = ref([])
-function flattenTree(nodes, depth = 0) {
+const expandedParents = ref(new Set())
+
+/** 展平分类树为平铺选项 */
+function flattenTree(nodes) {
   const result = []
-  for (const node of nodes) {
-    result.push({ text: '  '.repeat(depth) + node.name, value: node.name })
-    if (node.children?.length) result.push(...flattenTree(node.children, depth + 1))
+  for (const n of nodes) {
+    result.push({ text: n.name, value: String(n.id) })
+    if (n.children?.length) result.push(...flattenTree(n.children))
   }
   return result
 }
-onMounted(async () => {
-  try {
-    const tree = await getTree()
-    categoryOptions.value = flattenTree(tree || [])
-    // build flat category list for goods filter
-    const cats = []
-    function walk(nodes) {
-      for (const n of nodes) {
-        cats.push({ text: n.name, value: n.id })
-        if (n.children?.length) walk(n.children)
-      }
+
+/** 根据 ID 在 scopeTreeData 中查找分类名称 */
+function findCatName(id) {
+  for (const p of scopeTreeData.value) {
+    if (String(p.id) === String(id)) return p.name
+    if (p.children) {
+      const c = p.children.find(ch => String(ch.id) === String(id))
+      if (c) return c.name
     }
-    walk(tree || [])
-    flatCategories.value = cats
-  } catch { categoryOptions.value = []; flatCategories.value = [] }
-})
-function onScopeConfirm() {
-  shopForm.businessScope = scopeSelected.value.join('、')
-  showScopePicker.value = false
+  }
+  return id
 }
 
-function openScopePicker() {
-  scopeSelected.value = shopForm.businessScope ? shopForm.businessScope.split('、') : []
+/** 店铺主页展示的经营范围中文文本（由 shopInfo.businessScope ID 转换） */
+const scopeDisplayText = computed(() => {
+  if (!shopInfo.value?.businessScope) return ''
+  return shopInfo.value.businessScope.split(',').filter(Boolean).map(id => findCatName(id)).join('、')
+})
+
+/** 弹窗内平铺的全部分类选项 */
+const flatScopeOptions = ref([])
+
+onMounted(async () => {
+  // 加载全部分类树 → 展平为选项（供弹窗数据源 + 名称查找）
+  try {
+    const tree = await getTree()
+    scopeTreeData.value = tree || []
+    flatScopeOptions.value = flattenTree(tree || [])
+  } catch { scopeTreeData.value = []; flatScopeOptions.value = [] }
+  // 加载商家经营分类（商品管理分类筛选用）
+  try {
+    const cats = await getMyCategories()
+    if (cats?.length) {
+      const list = []
+      function walk(nodes) {
+        for (const n of nodes) {
+          list.push({ text: n.name, value: String(n.id) })
+          if (n.children?.length) walk(n.children)
+        }
+      }
+      walk(cats)
+      flatCategories.value = list
+      return
+    }
+  } catch { /* 忽略 */ }
+  // fallback：商家无分类限制时使用全部分类
+  if (flatCategories.value.length === 0 && categoryOptions.value.length > 0) {
+    flatCategories.value = categoryOptions.value
+  }
+})
+
+/** 店铺主页「修改」按钮 → 打开经营范围弹窗 */
+async function openScopeDirectly() {
+  scopeFromHeader.value = true
   showScopePicker.value = true
+}
+
+/** 弹窗每次打开：调用 API 获取商家已有分类 → 自动勾选 */
+const scopeFromHeader = ref(false)
+
+async function onScopeOpen() {
+  // 从 API 获取商家已有分类 ID 作为默认勾选
+  try {
+    const cats = await getMyCategories()
+    if (cats?.length) {
+      const ids = []
+      function collect(nodes) {
+        for (const n of nodes) {
+          ids.push(String(n.id))
+          if (n.children?.length) collect(n.children)
+        }
+      }
+      collect(cats)
+      scopeSelected.value = ids
+      showToast('已默认勾选您原本的分类，如需修改请重新选择')
+    } else {
+      scopeSelected.value = shopForm.businessScope ? shopForm.businessScope.split(',').filter(Boolean) : []
+    }
+  } catch {
+    scopeSelected.value = shopForm.businessScope ? shopForm.businessScope.split(',').filter(Boolean) : []
+  }
+}
+
+/** 弹窗「确定」 */
+async function onScopeConfirm() {
+  shopForm.businessScope = scopeSelected.value.map(String).join(',')
+  shopForm.businessScopeName = scopeSelected.value.map(id => findCatName(id)).join('、')
+  showScopePicker.value = false
+
+  // 从店铺主页直接修改 → 立即提交审核
+  if (scopeFromHeader.value) {
+    scopeFromHeader.value = false
+    try {
+      await updateShopInfo({ businessScope: shopForm.businessScope })
+      showDialog({ title: '提示', message: '修改申请已提交，请等待平台审核，审核通过后生效', confirmButtonColor: '#e8573a' })
+      await fetchShop()
+    } catch { /* toast by interceptor */ }
+  }
 }
 
 // ═══════════════ 店铺管理 ═══════════════
 const shopLoading = ref(false)
 const shopInfo = ref(null)
 const showShopDetail = ref(false)
-const shopSaving = ref(false)
+const basicSaving = ref(false)
+const auditSaving = ref(false)
 
 const shopForm = reactive({
-  shopName: '', businessScope: '', contactName: '', contactPhone: '',
+  shopName: '', businessScope: '', businessScopeName: '', contactName: '', contactPhone: '',
   shopDesc: '', shopNotice: '', businessHours: '', afterSaleInfo: '',
-  legalPerson: '', businessAddress: '',
+  legalPerson: '', businessAddress: '', verifiedContact: '',
   logoPreview: '', licensePreview: '', foodLicensePreview: '',
 })
 const logoInputRef = ref(null)
@@ -599,14 +694,14 @@ function openShopDetail() {
   const s = shopInfo.value
   shopForm.shopName = s.shopName || ''
   shopForm.businessScope = s.businessScope || ''
+  shopForm.businessScopeName = (s.businessScope || '').split(',').filter(Boolean).map(id => findCatName(id)).join('、')
   shopForm.contactName = s.contactName || ''
   shopForm.contactPhone = s.contactPhone || ''
   shopForm.shopDesc = s.shopDesc || ''
   shopForm.shopNotice = s.shopNotice || ''
   shopForm.businessHours = s.businessHours || ''
   shopForm.afterSaleInfo = s.afterSaleInfo || ''
-  shopForm.legalPerson = s.legalPerson || ''
-  shopForm.businessAddress = s.businessAddress || ''
+  scopeFromHeader.value = false  // 从对话框编辑，不触发直接保存
   // 图片预览重置
   shopForm.logoPreview = ''
   shopForm.licensePreview = ''
@@ -617,59 +712,101 @@ function openShopDetail() {
   showShopDetail.value = true
 }
 
-async function handleSaveShop() {
+async function handleSaveBasic() {
   if (!shopForm.shopName) return showToast('请输入店铺名称')
-  shopSaving.value = true
+  basicSaving.value = true
   try {
-    // 上传图片
-    let logoUrl = shopInfo.value?.shopLogo
+    const prev = shopInfo.value || {}
+    const changed = {}
+
+    // 只上传有变动的图片
+    let logoUrl = prev.shopLogo
     if (logoFile.value) {
       const { uploadImage } = await import('../../api/merchant.js')
       logoUrl = await uploadImage(logoFile.value, 'cert')
     }
-    let licenseUrl = shopInfo.value?.businessLicense
-    if (licenseFile.value) {
-      const { uploadImage } = await import('../../api/merchant.js')
-      licenseUrl = await uploadImage(licenseFile.value, 'cert')
-    }
-    let foodLicenseUrl = shopInfo.value?.foodLicense
-    if (foodLicenseFile.value) {
-      const { uploadImage } = await import('../../api/merchant.js')
-      foodLicenseUrl = await uploadImage(foodLicenseFile.value, 'cert')
-    }
+    if (logoUrl !== prev.shopLogo) changed.shopLogo = logoUrl
 
-    await updateShopInfo({
+    // 基础字段
+    const fields = {
       shopName: shopForm.shopName,
-      businessScope: shopForm.businessScope,
-      contactName: shopForm.contactName,
-      contactPhone: shopForm.contactPhone,
-      shopLogo: logoUrl,
-      businessLicense: licenseUrl,
-      foodLicense: foodLicenseUrl,
       shopDesc: shopForm.shopDesc,
       shopNotice: shopForm.shopNotice,
       businessHours: shopForm.businessHours,
       afterSaleInfo: shopForm.afterSaleInfo,
-      legalPerson: shopForm.legalPerson,
-      businessAddress: shopForm.businessAddress,
-    })
+    }
+    for (const [key, val] of Object.entries(fields)) {
+      if (String(val) !== String(prev[key] || '')) {
+        changed[key] = val
+      }
+    }
 
-    // A 类（资质类）字段需审核：businessLicense, foodLicense, contactName, contactPhone, legalPerson, businessAddress, businessScope
-    const prev = shopInfo.value
-    const aChanged = (
-      shopForm.businessScope !== (prev?.businessScope || '') ||
-      shopForm.contactName !== (prev?.contactName || '') ||
-      shopForm.contactPhone !== (prev?.contactPhone || '') ||
-      shopForm.legalPerson !== (prev?.legalPerson || '') ||
-      shopForm.businessAddress !== (prev?.businessAddress || '') ||
-      licenseFile.value !== null ||
-      foodLicenseFile.value !== null
-    )
-    showToast(aChanged ? '修改已提交，等待平台审核' : '修改成功')
+    if (Object.keys(changed).length === 0) {
+      showToast('未检测到修改')
+      showShopDetail.value = false
+      return
+    }
+
+    await updateShopInfo(changed)
+    showToast('保存成功')
     showShopDetail.value = false
     await fetchShop()
   } catch { /* toast by interceptor */ }
-  finally { shopSaving.value = false }
+  finally { basicSaving.value = false }
+}
+
+async function handleSaveAudit() {
+  if (!shopForm.contactName) return showToast('请输入联系人姓名')
+  if (!shopForm.contactPhone) return showToast('请输入联系手机号')
+  if (!shopForm.legalPerson) return showToast('请输入法人信息')
+  if (!shopForm.businessAddress) return showToast('请输入经营地址')
+  if (!shopForm.businessScope) return showToast('请选择主营分类')
+  auditSaving.value = true
+  try {
+    const prev = shopInfo.value || {}
+    const changed = {}
+
+    // 图片上传（有变动才上传）
+    let licenseUrl = prev.businessLicense
+    if (licenseFile.value) {
+      const { uploadImage } = await import('../../api/merchant.js')
+      licenseUrl = await uploadImage(licenseFile.value, 'cert')
+    }
+    if (licenseUrl !== prev.businessLicense) changed.businessLicense = licenseUrl
+
+    let foodUrl = prev.foodLicense
+    if (foodLicenseFile.value) {
+      const { uploadImage } = await import('../../api/merchant.js')
+      foodUrl = await uploadImage(foodLicenseFile.value, 'cert')
+    }
+    if (foodUrl !== prev.foodLicense) changed.foodLicense = foodUrl
+
+    // 文本字段
+    const fields = {
+      contactName: shopForm.contactName,
+      contactPhone: shopForm.contactPhone,
+      businessScope: shopForm.businessScope,
+      legalPerson: shopForm.legalPerson,
+      businessAddress: shopForm.businessAddress,
+      verifiedContact: shopForm.verifiedContact,
+    }
+    for (const [key, val] of Object.entries(fields)) {
+      if (String(val) !== String(prev[key] || '')) {
+        changed[key] = val
+      }
+    }
+
+    if (Object.keys(changed).length === 0) {
+      showToast('未检测到修改')
+      return
+    }
+
+    await updateShopInfo(changed)
+    showDialog({ title: '提示', message: '修改申请已提交，请等待平台审核，审核通过后生效', confirmButtonColor: '#e8573a' })
+    showShopDetail.value = false
+    await fetchShop()
+  } catch { /* toast by interceptor */ }
+  finally { auditSaving.value = false }
 }
 
 // ═══════════════ 商品管理 ═══════════════
@@ -1109,7 +1246,13 @@ onActivated(() => {
   max-width: 160px;
 }
 .sh-meta { font-size: 13px; font-weight: 600; opacity: 0.55; }
-.sh-scope { font-size: 11px; opacity: 0.55; margin-top: 2px; }
+.sh-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.sh-scope { font-size: 11px; opacity: 0.55; }
 .sh-actions {
   flex-shrink: 0;
   display: flex;
@@ -1570,6 +1713,11 @@ onActivated(() => {
 .scope-popup {
   max-height: 60vh;
 }
+.scope-popup-inner {
+  width: 85vw;
+  max-width: 440px;
+  border-radius: 12px;
+}
 .scope-popup-header {
   display: flex;
   justify-content: space-between;
@@ -1596,8 +1744,68 @@ onActivated(() => {
   max-height: 40vh;
   overflow-y: auto;
 }
-.scope-checkbox {
-  padding: 10px 0;
+/* ── 经营范围平铺复选框 ── */
+.scope-checkbox-row {
+  padding: 6px 0;
+}
+.scope-checkbox-item {
+  padding: 0;
+}
+.modify-btn {
+  color: #e8573a !important;
+  border-color: #e8573a !important;
+  font-size: 12px !important;
+  padding: 0 10px !important;
+  height: 28px !important;
+}
+.modify-btn-shop {
+  color: #fff !important;
+  border-color: rgba(255,255,255,0.5) !important;
+  font-size: 11px !important;
+  padding: 0 8px !important;
+  height: 24px !important;
+  flex-shrink: 0;
+}
+
+/* ── 编辑弹窗分栏 ── */
+.edit-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0ece8;
+}
+.edit-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.edit-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e8573a;
+  display: inline-block;
+}
+.dialog-btn-basic {
+  margin-top: 20px;
+  height: 42px;
+  font-size: 15px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  width: 100%;
+}
+.dialog-btn-audit {
+  margin-top: 20px;
+  height: 42px;
+  font-size: 15px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  width: 100%;
 }
 
 /* ── 编辑驳回横幅 ── */

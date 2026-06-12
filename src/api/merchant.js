@@ -109,3 +109,13 @@ export function getMerchantGoods(merId, params) {
 export function getMerchantReviews(merId, params) {
   return request.get(`/merchant/${merId}/reviews`, { params })
 }
+
+/** 查询指定店铺的经营分类列表（买家端公开） */
+export function getMerchantCategories(merId) {
+  return request.get(`/merchant/${merId}/categories`)
+}
+
+/** 查询当前商家的经营分类列表（商家后台） */
+export function getMyCategories() {
+  return request.get('/merchant/categories')
+}
