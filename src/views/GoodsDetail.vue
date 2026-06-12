@@ -428,7 +428,6 @@ async function fetchDetail() {
     spu.value = null
   } finally {
     loading.value = false
-    if (spu.value?.merchantId) fetchMerchantInfo()
   }
 }
 
@@ -561,8 +560,8 @@ async function fetchMerchantInfo() {
   if (!mid) return
   try {
     const [info, dsr] = await Promise.all([
-      getMerchantInfo(mid).catch(() => null),
-      getShopDsr(mid).catch(() => null),
+      getMerchantInfo(mid, { silent: true }).catch(() => null),
+      getShopDsr(mid, { silent: true }).catch(() => null),
     ])
     if (info) merchantInfo.value = info
     if (dsr) merchantDsr.value = dsr
@@ -581,6 +580,18 @@ function merchantStarClass(pos, score) {
 function goToShop() {
   const mid = merchantInfo.value?.id || spu.value?.merchantId
   if (mid) {
+    if (!userStore.isLogin) {
+      showConfirmDialog({
+        title: '提示',
+        message: '请先登录后再进入店铺',
+        confirmButtonText: '去登录',
+        cancelButtonText: '再想想',
+        confirmButtonColor: '#e8573a',
+      }).then(() => {
+        router.push({ name: 'Login', query: { redirect: `/shop/${mid}` } })
+      }).catch(() => {})
+      return
+    }
     router.push(`/shop/${mid}`)
   } else {
     showToast('店铺信息获取中')

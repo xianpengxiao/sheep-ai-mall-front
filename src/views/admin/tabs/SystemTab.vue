@@ -1,11 +1,14 @@
 <template>
   <div class="tab-system">
-    <!-- 搜索框（防抖 300ms） -->
+    <!-- 工具栏 -->
     <div class="sys-toolbar">
       <div class="sys-search">
         <van-icon name="search" size="14" color="#c8c4c0" />
         <input v-model="keyword" placeholder="搜索用户名/真实姓名/手机号" @input="onSearchInput" @keyup.enter="handleSearch" />
       </div>
+      <van-button round size="small" class="sync-btn" :loading="syncLoading" @click="handleSyncSearch">
+        <van-icon name="replay" :class="{ spinning: syncLoading }" /> 同步搜索数据
+      </van-button>
     </div>
 
     <!-- 表格 -->
@@ -119,9 +122,24 @@
 import { ref, computed, onMounted } from 'vue'
 import { showToast, showConfirmDialog } from 'vant'
 import { useUserStore } from '../../../stores/user.js'
-import { getAdminUsers, getAllRoles, getUserRoleIds, assignUserRoles, toggleUserStatus } from '../../../api/admin.js'
+import { getAdminUsers, getAllRoles, getUserRoleIds, assignUserRoles, toggleUserStatus, syncSearchData } from '../../../api/admin.js'
 
 const userStore = useUserStore()
+
+// ── 同步搜索 ──
+const syncLoading = ref(false)
+
+async function handleSyncSearch() {
+  syncLoading.value = true
+  try {
+    await syncSearchData()
+    showToast('搜索同步成功')
+  } catch {
+    showToast('搜索同步失败')
+  } finally {
+    syncLoading.value = false
+  }
+}
 
 // ── 搜索（防抖 300ms） ──
 const keyword = ref('')
@@ -291,8 +309,13 @@ onMounted(loadData)
 .tab-system { font-size: 13px; }
 .loading-center { padding: 60px 0; }
 
-/* ── 搜索栏 ── */
-.sys-toolbar { margin-bottom: 16px; }
+/* ── 工具栏 ── */
+.sys-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
 .sys-search {
   display: flex;
   align-items: center;
@@ -313,6 +336,19 @@ onMounted(loadData)
   color: #1a1a2e;
 }
 .sys-search input::placeholder { color: #c8c4c0; }
+.sync-btn {
+  height: 36px;
+  font-size: 13px;
+  font-weight: 500;
+  background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+.sync-btn:active { opacity: 0.9; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sync-btn :deep(.van-icon-replay.spinning) { animation: spin 1s linear infinite; }
 
 /* ── 表格 ── */
 .sys-table-wrap { overflow-x: auto; }

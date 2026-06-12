@@ -64,13 +64,13 @@ export function getDsrTrend() {
 }
 
 /** 查询指定店铺的 DSR 三维评分 */
-export function getShopDsr(id) {
-  return request.get(`/merchant/${id}/dsr`)
+export function getShopDsr(id, options) {
+  return request.get(`/merchant/${id}/dsr`, options)
 }
 
 /** 获取商家公开信息（买家端，需登录） */
-export function getMerchantInfo(id) {
-  return request.get(`/merchant/${id}`)
+export function getMerchantInfo(id, options) {
+  return request.get(`/merchant/${id}`, options)
 }
 
 /** 切换营业状态 */

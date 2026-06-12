@@ -3,7 +3,10 @@
     <NavBar title="店铺" />
 
     <!-- ═══════ 店铺信息头 ═══════ -->
-    <div v-if="shopInfo" class="shop-header">
+    <div v-if="shopLoadFail" class="shop-error">
+      <van-empty description="店铺不存在或已关闭" />
+    </div>
+    <div v-else-if="shopInfo" class="shop-header">
       <div class="sh-top">
         <van-image
           width="56" height="56" round
@@ -45,7 +48,7 @@
         <span class="sh-total">{{ shopInfo.dsrCount || 0 }}条评价</span>
       </div>
     </div>
-    <van-loading v-else class="sh-loading" size="24" />
+    <van-loading v-else-if="!shopLoadFail" class="sh-loading" size="24" />
 
     <!-- ═══════ Tab ═══════ -->
     <van-tabs v-model:active="activeTab" class="shop-tabs" sticky offset-top="46">
@@ -145,6 +148,7 @@ const defaultLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 
 // ── 店铺信息 ──
 const shopInfo = ref(null)
+const shopLoadFail = ref(false)
 
 // ── Tab ──
 const activeTab = ref('goods')
@@ -185,11 +189,13 @@ function previewImages(images, index) {
 async function fetchShopInfo() {
   const id = route.params.id
   if (!id) return
+  shopLoadFail.value = false
   try {
-    shopInfo.value = await getMerchantInfo(id)
+    shopInfo.value = await getMerchantInfo(id, { silent: true })
   } catch {
-    showToast('店铺不存在')
-    router.back()
+    shopInfo.value = null
+    shopLoadFail.value = true
+    console.warn('[Shop] 店铺不存在或获取失败 id=', id)
   }
 }
 
@@ -244,6 +250,16 @@ onMounted(async () => {
   await fetchShopInfo()
   fetchGoods()
 })
+
+// keep-alive 缓存下路由参数变化时重新加载数据
+watch(() => route.params.id, (newId) => {
+  if (route.name === 'Shop' && newId) {
+    shopInfo.value = null
+    fetchShopInfo()
+    fetchGoods()
+    reviewsList.value = []
+  }
+})
 </script>
 
 <style scoped>
@@ -251,6 +267,17 @@ onMounted(async () => {
   min-height: 100vh;
   background: #f5f3f0;
   padding-bottom: 20px;
+}
+
+/* ── 店铺加载失败 ── */
+.shop-error {
+  background: #fff;
+  padding: 40px 0;
+}
+.sh-loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
 }
 
 /* ── 店铺信息头 ── */

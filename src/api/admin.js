@@ -90,3 +90,10 @@ export function deleteReview(reviewId) {
 export function toggleUserStatus(userId, status) {
   return request.put('/admin/users/' + userId + '/status', null, { params: { status } })
 }
+
+// ── 搜索同步 ──
+
+/** 同步所有上架商品到 ES 搜索索引 */
+export function syncSearchData() {
+  return request.post('/search/sync-all')
+}

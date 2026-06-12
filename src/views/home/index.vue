@@ -81,18 +81,31 @@
       <!-- 搜索条 -->
       <div class="search-bar" v-if="!showSearch" @click="openSearch">
         <van-icon name="search" size="17" color="#9a9aae" />
-        <span>搜索商品、品牌...</span>
+        <span>搜索商品、商家...</span>
       </div>
 
       <!-- 激活态：输入框 + 下拉面板 -->
       <template v-else>
         <form class="search-bar active" @submit.prevent="onSearchSubmit">
+          <div class="search-type-wrap">
+            <span class="search-type-select" @click.stop="toggleTypeDropdown">
+              <span class="search-type-text">{{ searchType === 'goods' ? '商品' : '商家' }}</span>
+              <van-icon name="arrow-down" size="10" color="#5a5a6e" :class="{ rotated: showTypeDropdown }" />
+            </span>
+            <transition name="drop-fade">
+              <div v-if="showTypeDropdown" class="search-type-dropdown">
+                <div class="drop-item" :class="{ active: searchType === 'goods' }" @click="selectType('goods')">商品</div>
+                <div class="drop-item" :class="{ active: searchType === 'merchant' }" @click="selectType('merchant')">商家</div>
+              </div>
+            </transition>
+          </div>
+          <span class="search-type-divider"></span>
           <van-icon name="search" size="17" color="#9a9aae" />
           <input
             ref="searchInputRef"
             v-model="searchKeyword"
             class="search-input-field"
-            placeholder="搜索商品、品牌..."
+            :placeholder="searchType === 'goods' ? '搜索商品、品牌...' : '搜索店铺...'"
             autofocus
           />
           <van-icon name="search" size="17" color="#fff" class="search-btn-icon" @click="onSearchSubmit" />
@@ -206,7 +219,7 @@ import { showToast, showDialog } from 'vant'
 import { useUserStore } from '../../stores/user.js'
 import { getCurrentUser } from '../../api/member.js'
 import { getTree } from '../../api/category.js'
-import { getSpuPage } from '../../api/goods.js'
+import { searchProducts } from '../../api/search.js'
 import { getMerchantApplyStatus } from '../../api/merchant.js'
 import GoodsCard from '../../components/GoodsCard.vue'
 
@@ -322,6 +335,8 @@ async function handleMerchantIcon() {
 // ── 搜索遮罩 ──
 const showSearch = ref(false)
 const searchKeyword = ref('')
+const searchType = ref('goods')     // 'goods' | 'merchant'
+const showTypeDropdown = ref(false)
 const searchWrapRef = ref(null)
 
 const HISTORY_KEY = 'search_history'
@@ -365,6 +380,26 @@ function onSearchSubmit() {
   router.push({ name: 'Search', query: { keyword: kw } })
 }
 
+/** 切换类型下拉 */
+function toggleTypeDropdown() {
+  showTypeDropdown.value = !showTypeDropdown.value
+}
+/** 选择搜索类型 */
+function selectType(type) {
+  searchType.value = type
+  showTypeDropdown.value = false
+}
+
+// ── 点击外部关闭类型下拉 ──
+function onDocClick(e) {
+  if (showTypeDropdown.value) {
+    const wrap = document.querySelector('.search-bar.active .search-type-wrap')
+    if (wrap && !wrap.contains(e.target)) showTypeDropdown.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onDocClick))
+onUnmounted(() => document.removeEventListener('click', onDocClick))
+
 const cartCount = ref(0)
 
 const CAT_ICONS = {
@@ -380,12 +415,16 @@ const quickCategories = ref([])
 const quickActive = ref(0)
 
 function buildQuickCats(tree) {
-  const list = (tree || []).slice(0, 8)
-  return list.map(cat => ({
+  const virtual = [
+    { id: 'hot', name: '热销推荐', icon: '🔥', virtual: true },
+    { id: 'newest', name: '最新上架', icon: '🆕', virtual: true },
+  ]
+  const list = (tree || []).slice(0, 6).map(cat => ({
     id: cat.id,
     name: cat.name,
     icon: matchIcon(cat.name),
   }))
+  return [...virtual, ...list]
 }
 
 function matchIcon(name) {
@@ -398,6 +437,11 @@ function matchIcon(name) {
 function onQuickCatClick(index) {
   quickActive.value = index
   const cat = quickCategories.value[index]
+  if (cat.virtual) {
+    activeSubId.value = null
+    resetGoodsList()
+    return
+  }
   const treeCat = categoryTree.value.find(c => c.id === cat?.id)
   const children = treeCat?.children
   activeSubId.value = children?.length ? children[0].id : null
@@ -435,6 +479,10 @@ onMounted(async () => {
         activeSubId.value = firstChildren[0].id
       }
     }
+    // 分类加载完成后，重置状态并加载商品
+    resetGoodsList()
+    loading.value = true
+    onLoad()
   } catch {
     // 静默处理
   }
@@ -467,30 +515,26 @@ async function onLoad() {
   const catId = currentCategoryId.value
   if (!catId) {
     loading.value = false
+    finished.value = true
     return
   }
 
+  const activeCat = quickCategories.value[quickActive.value]
+  const params = { pageNum: pageNum.value, pageSize }
+  if (activeCat?.virtual) {
+    params.sortBy = activeCat.id === 'hot' ? 'salesDesc' : 'newest'
+  } else {
+    params.categoryId = catId
+    params.sortBy = 'salesDesc'
+  }
+
   try {
-    const res = await getSpuPage({
-      categoryId: catId,
-      pageNum: pageNum.value,
-      pageSize,
-    })
-    const page = res || {}
-    let records = page.records || []
-
-    // 过滤已下架（status=0）和已打烊商家的商品
-    records = records.filter(r => String(r.status) !== '0' && (r.shopStatus === undefined || r.shopStatus === null || String(r.shopStatus) !== '0'))
-
-    // 后端已返回 minPrice，无值则显示 0.00
+    const page = await searchProducts(params)
+    const records = page?.records || []
     records.forEach(r => { if (!r.minPrice && r.minPrice !== 0) r.minPrice = '0.00' })
-
     goodsList.value.push(...records)
     pageNum.value++
-
-    if (records.length < pageSize) {
-      finished.value = true
-    }
+    if (records.length < pageSize) finished.value = true
   } catch {
     finished.value = true
   } finally {
@@ -710,6 +754,73 @@ async function onLoad() {
   color: #9a9aae;
   font-size: 14px;
   flex: 1;
+}
+.search-type-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none !important;
+}
+.search-type-select {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.search-type-select:active {
+  background: #eae6e2;
+}
+.search-type-select .van-icon.rotated {
+  transform: rotate(180deg);
+}
+.search-type-text {
+  flex: none !important;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent, #e8573a) !important;
+}
+.search-type-divider {
+  flex: none !important;
+  width: 1px;
+  height: 20px;
+  background: #e0dcd8;
+}
+/* 类型下拉面板 */
+.search-type-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  min-width: 100px;
+  padding: 6px;
+  z-index: 200;
+  overflow: hidden;
+}
+.search-type-dropdown .drop-item {
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #1a1a2e;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+}
+.search-type-dropdown .drop-item:hover {
+  background: #f5f3f0;
+}
+.search-type-dropdown .drop-item:active {
+  background: #f0ece8;
+}
+.search-type-dropdown .drop-item.active {
+  color: var(--accent, #e8573a);
+  font-weight: 600;
+  background: #fdf0ed;
 }
 
 /* 搜索激活态输入框 */

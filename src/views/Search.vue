@@ -5,11 +5,24 @@
       <div class="search-top-bar">
         <van-icon name="arrow-left" size="20" class="back-icon" @click="goBack" />
         <form class="search-field" :class="{ focused: isFocused }" @submit.prevent="doSearch">
+          <div class="search-type-wrap">
+            <span class="search-type-select" @click.stop="toggleTypeDropdown">
+              <span class="search-type-text">{{ searchType === 'goods' ? '商品' : '商家' }}</span>
+              <van-icon name="arrow-down" size="10" color="#5a5a6e" :class="{ rotated: showTypeDropdown }" />
+            </span>
+            <transition name="drop-fade">
+              <div v-if="showTypeDropdown" class="search-type-dropdown">
+                <div class="drop-item" :class="{ active: searchType === 'goods' }" @click="selectType('goods')">商品</div>
+                <div class="drop-item" :class="{ active: searchType === 'merchant' }" @click="selectType('merchant')">商家</div>
+              </div>
+            </transition>
+          </div>
+          <span class="search-type-divider"></span>
           <van-icon name="search" size="17" color="#9a9aae" />
           <input
             v-model="keyword"
             class="search-field-input"
-            placeholder="搜索商品、品牌..."
+            :placeholder="searchType === 'goods' ? '搜索商品、品牌...' : '搜索店铺...'"
             @focus="onInputFocus"
             @blur="onInputBlur"
             @input="onKeywordChange"
@@ -36,8 +49,8 @@
         </div>
       </div>
 
-      <!-- 筛选栏 -->
-      <div class="filter-bar">
+      <!-- 筛选栏（仅商品搜索显示） -->
+      <div v-if="searchType === 'goods'" class="filter-bar">
         <van-dropdown-menu active-color="#e8573a">
           <van-dropdown-item v-model="categoryFilter" :options="categoryOptions" title="分类" />
           <van-dropdown-item v-model="priceFilter" :options="priceOptions" title="价格" />
@@ -48,7 +61,7 @@
 
     <!-- ═══════ 空搜索提示 ═══════ -->
     <div v-if="!hasSearched && !isFocused && !keyword" class="state-wrap">
-      <van-empty description="输入关键词搜索商品" />
+      <van-empty :description="searchType === 'goods' ? '输入关键词搜索商品' : '输入关键词搜索店铺'" />
     </div>
 
     <!-- ═══════ 加载中 ═══════ -->
@@ -58,13 +71,13 @@
 
     <!-- ═══════ 无结果 ═══════ -->
     <div v-else-if="!loading && goodsList.length === 0" class="state-wrap">
-      <van-empty description="未找到相关商品">
+      <van-empty :description="searchType === 'goods' ? '未找到相关商品' : '未找到相关商家'">
         <span class="empty-hint">试试其他关键词吧</span>
       </van-empty>
     </div>
 
-    <!-- ═══════ 搜索结果列表 ═══════ -->
-    <div v-else class="results-section">
+    <!-- ═══════ 商品搜索结果 ═══════ -->
+    <div v-else-if="searchType === 'goods'" class="results-section">
       <div class="results-header">
         <span class="results-count">找到 {{ total }} 件商品</span>
       </div>
@@ -89,14 +102,60 @@
         </div>
       </van-list>
     </div>
+
+    <!-- ═══════ 商家搜索结果 ═══════ -->
+    <div v-else class="results-section">
+      <div class="results-header">
+        <span class="results-count">找到 {{ total }} 家店铺</span>
+      </div>
+      <van-list
+        v-model:loading="loading"
+        :finished="finished"
+        finished-text="没有更多了"
+        @load="onLoad"
+        offset="80"
+      >
+        <div class="merchant-list">
+          <div
+            v-for="item in goodsList"
+            :key="item.id"
+            class="merchant-card"
+            @click="goShop(item.id)"
+          >
+            <van-image
+              class="merchant-logo"
+              :src="item.shopLogo"
+              fit="cover"
+              round
+              width="56"
+              height="56"
+            />
+            <div class="merchant-info">
+              <div class="merchant-name" v-html="item.shopNameHighlight || item.shopName"></div>
+              <div class="merchant-desc" v-html="item.shopDescHighlight || item.shopDesc"></div>
+              <div class="merchant-scores">
+                <span class="score-item score-main">
+                  <van-icon name="star" color="#f39c12" size="12" />
+                  {{ item.compositeScore }}
+                </span>
+                <span class="score-label">描述 {{ item.describeScore }}</span>
+                <span class="score-label">服务 {{ item.serviceScore }}</span>
+                <span class="score-label">物流 {{ item.logisticsScore }}</span>
+              </div>
+            </div>
+            <van-icon name="arrow" color="#c0b8b0" class="merchant-arrow" />
+          </div>
+        </div>
+      </van-list>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
-import { searchProducts } from '../api/search.js'
+import { searchProducts, searchMerchant } from '../api/search.js'
 import { getTree } from '../api/category.js'
 import GoodsCard from '../components/GoodsCard.vue'
 
@@ -112,6 +171,8 @@ const hasSearched = ref(false)
 const isFocused = ref(false)
 const searchWrapRef = ref(null)
 const historyList = ref(loadHistory())
+const searchType = ref('goods')   // 'goods' | 'merchant'
+const showTypeDropdown = ref(false)
 
 // ── 筛选状态 ──
 const categoryFilter = ref(0)
@@ -173,6 +234,32 @@ function parsePriceRange(val) {
   }
 }
 
+/** 切换类型下拉 */
+function toggleTypeDropdown() {
+  showTypeDropdown.value = !showTypeDropdown.value
+}
+
+/** 选择搜索类型 */
+function selectType(type) {
+  if (type === searchType.value) {
+    showTypeDropdown.value = false
+    return
+  }
+  searchType.value = type
+  showTypeDropdown.value = false
+  hasSearched.value = false
+  goodsList.value = []
+  pageNum = 1
+  finished.value = false
+  total.value = 0
+  const kw = keyword.value.trim()
+  if (kw) doSearch()
+}
+
+function goShop(id) {
+  router.push(`/shop/${id}`)
+}
+
 // ── 搜索 ──
 async function doSearch() {
   const kw = keyword.value.trim()
@@ -201,20 +288,27 @@ function onKeywordChange() {
 
 async function fetchResults() {
   const kw = keyword.value.trim()
-  const priceRange = parsePriceRange(priceFilter.value)
   try {
-    const params = {
-      keyword: kw,
-      pageNum,
-      pageSize,
-      ...(categoryFilter.value ? { categoryId: categoryFilter.value } : {}),
-      ...(priceRange.minPrice !== undefined ? { minPrice: priceRange.minPrice } : {}),
-      ...(priceRange.maxPrice !== undefined ? { maxPrice: priceRange.maxPrice } : {}),
-      sortBy: sortFilter.value,
+    let page
+    if (searchType.value === 'merchant') {
+      page = await searchMerchant({
+        keyword: kw,
+        pageNum,
+        pageSize,
+      })
+    } else {
+      const priceRange = parsePriceRange(priceFilter.value)
+      const params = {
+        keyword: kw,
+        pageNum,
+        pageSize,
+        ...(categoryFilter.value ? { categoryId: categoryFilter.value } : {}),
+        ...(priceRange.minPrice !== undefined ? { minPrice: priceRange.minPrice } : {}),
+        ...(priceRange.maxPrice !== undefined ? { maxPrice: priceRange.maxPrice } : {}),
+        sortBy: sortFilter.value,
+      }
+      page = await searchProducts(params)
     }
-    console.log('[Search] 请求参数:', params)
-    const page = await searchProducts(params)
-    console.log('[Search] 返回数据:', page)
     const records = page?.records || []
     goodsList.value.push(...records)
     total.value = page?.total || records.length
@@ -261,11 +355,11 @@ function onLoad() {
   }
 }
 
-// ── 监听筛选变化重新搜索 ──
+// ── 监听筛选变化重新搜索（仅商品模式） ──
 watch([categoryFilter, priceFilter, sortFilter], () => {
+  if (searchType.value !== 'goods') return
   const kw = keyword.value.trim()
   if (!kw) return
-  // 已有搜索记录时，切换筛选自动重新搜索
   if (hasSearched.value) doSearch()
 })
 
@@ -277,6 +371,18 @@ function goBack() {
     router.replace('/')
   }
 }
+
+// ── 点击外部关闭类型下拉 ──
+function onDocumentClick(e) {
+  if (showTypeDropdown.value) {
+    const wrap = document.querySelector('.search-type-wrap')
+    if (wrap && !wrap.contains(e.target)) {
+      showTypeDropdown.value = false
+    }
+  }
+}
+onMounted(() => document.addEventListener('click', onDocumentClick))
+onUnmounted(() => document.removeEventListener('click', onDocumentClick))
 
 // ── 生命周期 ──
 onMounted(async () => {
@@ -384,6 +490,75 @@ async function loadCategoryTree() {
   font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+/* ── 搜索框内类型选择器 + 下拉 ── */
+.search-type-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-type-select {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.search-type-select:active {
+  background: #eae6e2;
+}
+.search-type-select .van-icon.rotated {
+  transform: rotate(180deg);
+}
+.search-type-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent, #e8573a);
+}
+.search-type-divider {
+  width: 1px;
+  height: 20px;
+  background: #e0dcd8;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+/* 类型下拉面板 */
+.search-type-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  min-width: 100px;
+  padding: 6px;
+  z-index: 200;
+  overflow: hidden;
+}
+.search-type-dropdown .drop-item {
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #1a1a2e;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: center;
+}
+.search-type-dropdown .drop-item:hover {
+  background: #f5f3f0;
+}
+.search-type-dropdown .drop-item:active {
+  background: #f0ece8;
+}
+.search-type-dropdown .drop-item.active {
+  color: var(--accent, #e8573a);
+  font-weight: 600;
+  background: #fdf0ed;
 }
 
 /* ── 筛选栏 ── */
@@ -512,6 +687,91 @@ async function loadCategoryTree() {
   color: var(--accent, #e8573a);
 }
 
+/* ── 商家搜索结果 ── */
+.merchant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.merchant-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 6px;
+  border-bottom: 1px solid #f0ece8;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.merchant-card:active {
+  background: #faf8f6;
+}
+.merchant-logo {
+  flex-shrink: 0;
+  border: 2px solid #f0ece8;
+}
+.merchant-info {
+  flex: 1;
+  min-width: 0;
+}
+.merchant-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.merchant-name em {
+  font-style: normal;
+  color: var(--accent, #e8573a);
+}
+.merchant-desc {
+  font-size: 12px;
+  color: #8a8a9e;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.merchant-desc em {
+  font-style: normal;
+  color: var(--accent, #e8573a);
+}
+.merchant-scores {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.score-item {
+  font-size: 13px;
+  color: #5a5a6e;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.score-main {
+  font-weight: 600;
+  color: #e8573a;
+}
+.score-label {
+  font-size: 11px;
+  color: #9a9aae;
+}
+.merchant-arrow {
+  flex-shrink: 0;
+}
+
+/* ── 下拉动画 ── */
+.drop-fade-enter-active, .drop-fade-leave-active {
+  transition: all 0.2s ease;
+}
+.drop-fade-enter-from, .drop-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 /* ══════════════════════════════════════════════════════════════
    响应式
    ══════════════════════════════════════════════════════════════ */
@@ -525,6 +785,9 @@ async function loadCategoryTree() {
   }
   .results-section {
     padding: 20px 16px 24px;
+  }
+  .merchant-card {
+    padding: 20px 12px;
   }
 }
 
