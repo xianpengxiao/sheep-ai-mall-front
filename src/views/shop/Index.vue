@@ -1,6 +1,8 @@
 <template>
   <div class="page-shop">
-    <NavBar title="店铺" />
+    <div class="shop-navbar-wrap">
+      <NavBar title="店铺" />
+    </div>
 
     <!-- ═══════ 店铺信息头 ═══════ -->
     <div v-if="shopLoadFail" class="shop-error">
@@ -88,10 +90,10 @@
               class="filter-btn"
               :class="{ active: reviewRating === opt.value }"
               @click="filterReviews(opt.value)"
-            >{{ opt.label }}</span>
+            >{{ opt.label }}<em v-if="opt.count != null" class="filter-count">{{ opt.count }}</em></span>
           </div>
-          <div v-if="reviewsList.length > 0" class="review-list">
-            <div v-for="item in reviewsList" :key="item.id" class="review-item">
+          <div v-if="displayReviews.length > 0" class="review-list">
+            <div v-for="item in displayReviews" :key="item.id" class="review-item">
               <div class="review-user-row">
                 <van-image v-if="item.avatar" round width="32" height="32" :src="item.avatar" class="review-avatar" />
                 <div v-else class="review-avatar-placeholder"><van-icon name="user-o" size="16" color="#c8c4c0" /></div>
@@ -100,10 +102,14 @@
                   <span class="review-time">{{ item.createTime }}</span>
                 </div>
                 <span class="review-stars">
-                  <van-icon v-for="s in 5" :key="s" :name="s <= item.rating ? 'star' : 'star-o'" size="13" :color="s <= item.rating ? '#f39c12' : '#e0dcd8'" />
+                  <van-icon v-for="s in 5" :key="s" :name="s <= item.rating ? 'star' : 'star-o'" size="16" :color="s <= item.rating ? '#f39c12' : '#e0dcd8'" />
                 </span>
               </div>
               <div class="review-content">{{ item.content }}</div>
+              <div v-if="item.spuName || item.skuName" class="review-spec-row">
+                <span v-if="item.spuName" class="review-spu">{{ item.spuName }}</span>
+                <span v-if="item.skuName" class="review-sku">{{ item.skuName }}</span>
+              </div>
               <div v-if="item.imageList?.length" class="review-images">
                 <van-image
                   v-for="(img, i) in item.imageList" :key="i"
@@ -116,11 +122,10 @@
           <van-empty v-else-if="!reviewsLoading" description="暂无评价" />
           <van-loading v-if="reviewsLoading" class="loading-center" size="24" />
           <van-pagination
-            v-if="reviewsTotal > 0"
+            v-if="filteredTotal > 0"
             v-model="reviewsPage"
-            :total-items="reviewsTotal"
+            :total-items="filteredTotal"
             :items-per-page="reviewsPageSize"
-            @change="fetchReviews"
             mode="simple"
             class="shop-pagination"
           />
@@ -134,7 +139,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onActivated, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { getMerchantInfo, getMerchantGoods, getMerchantReviews } from '../../api/merchant.js'
@@ -167,12 +172,35 @@ const reviewsPage = ref(1)
 const reviewsPageSize = 10
 const reviewsTotal = ref(0)
 const reviewRating = ref(0)
-const reviewFilterOptions = [
-  { label: '全部', value: 0 },
-  { label: '好评', value: 1 },
-  { label: '中评', value: 2 },
-  { label: '差评', value: 3 },
-]
+const reviewFilterOptions = computed(() => {
+  const all = reviewsList.value
+  return [
+    { label: '全部', value: 0, count: all.length },
+    { label: '好评', value: 1, count: all.filter(r => r.rating >= 4).length },
+    { label: '中评', value: 2, count: all.filter(r => r.rating === 3).length },
+    { label: '差评', value: 3, count: all.filter(r => r.rating <= 2).length },
+  ]
+})
+
+/** 客户端按评分过滤 */
+const filteredReviews = computed(() => {
+  const list = reviewsList.value
+  const r = reviewRating.value
+  if (r === 0) return list
+  if (r === 1) return list.filter(i => i.rating >= 4)
+  if (r === 2) return list.filter(i => i.rating === 3)
+  if (r === 3) return list.filter(i => i.rating <= 2)
+  return list
+})
+
+/** 当前页展示的评价 */
+const displayReviews = computed(() => {
+  const start = (reviewsPage.value - 1) * reviewsPageSize
+  return filteredReviews.value.slice(start, start + reviewsPageSize)
+})
+
+/** 过滤后的总数 */
+const filteredTotal = computed(() => filteredReviews.value.length)
 
 // ── 图片预览 ──
 const showPreview = ref(false)
@@ -221,9 +249,7 @@ async function fetchReviews() {
   if (!id) return
   reviewsLoading.value = true
   try {
-    const params = { pageNum: reviewsPage.value, pageSize: reviewsPageSize }
-    if (reviewRating.value > 0) params.rating = reviewRating.value
-    const res = await getMerchantReviews(id, params)
+    const res = await getMerchantReviews(id, { pageNum: 1, pageSize: 50 })
     reviewsList.value = res.records || res.list || []
     reviewsTotal.value = res.total || 0
   } catch {
@@ -236,12 +262,18 @@ async function fetchReviews() {
 function filterReviews(val) {
   reviewRating.value = val
   reviewsPage.value = 1
-  fetchReviews()
 }
 
 // 切换到评价 Tab 时加载数据
 watch(activeTab, (val) => {
-  if (val === 'reviews' && reviewsList.value.length === 0 && !reviewsLoading.value) {
+  if (val === 'reviews' && !reviewsLoading.value) {
+    fetchReviews()
+  }
+})
+
+// keep-alive 重新激活时刷新评价
+onActivated(() => {
+  if (route.name === 'Shop' && activeTab.value === 'reviews') {
     fetchReviews()
   }
 })
@@ -280,19 +312,21 @@ watch(() => route.params.id, (newId) => {
   padding: 60px 0;
 }
 
-/* ── 店铺信息头 ── */
+/* ── 店铺信息头（暖色渐变，参考商家中心风格） ── */
 .shop-header {
-  background: #fff;
-  padding: 20px 16px 16px;
-  margin-bottom: 8px;
+  background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%);
+  color: #fff;
+  padding: 0;
+  margin-bottom: 0;
 }
 .sh-top {
   display: flex;
   gap: 14px;
+  padding: 20px 18px 12px;
 }
 .sh-logo {
   flex-shrink: 0;
-  border: 2px solid #f0ece8;
+  border: 2px solid rgba(255,255,255,0.25);
 }
 .sh-info {
   flex: 1;
@@ -307,7 +341,7 @@ watch(() => route.params.id, (newId) => {
 .sh-name {
   font-size: 18px;
   font-weight: 700;
-  color: #1a1a2e;
+  color: #fff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -316,19 +350,22 @@ watch(() => route.params.id, (newId) => {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 8px;
   white-space: nowrap;
 }
 .sh-badge.on {
-  background: #e8f8ee;
-  color: #07c160;
+  background: rgba(105,240,174,0.2);
+  color: #69f0ae;
+}
+.sh-badge.on .sh-dot {
+  box-shadow: 0 0 3px currentColor;
 }
 .sh-badge.off {
-  background: #f5f3f0;
-  color: #9a9aae;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.6);
 }
 .sh-dot {
   width: 5px; height: 5px;
@@ -339,65 +376,82 @@ watch(() => route.params.id, (newId) => {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 .sh-tag {
   font-size: 11px;
-  color: #9a9aae;
-  background: #f5f3f0;
-  padding: 2px 8px;
-  border-radius: 4px;
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.12);
+  padding: 1px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
 }
 .sh-meta {
   font-size: 12px;
-  color: #9a9aae;
   margin-top: 2px;
+  opacity: 0.55;
 }
 .sh-desc-row {
-  margin: 10px 0 0;
-  font-size: 13px;
-  color: #5a5a6e;
+  padding: 2px 18px 10px;
+  font-size: 12px;
   line-height: 1.5;
+  color: rgba(255,255,255,0.85);
 }
 .sh-score {
   display: flex;
   align-items: center;
-  gap: 2px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid #f0ece8;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.06);
   flex-wrap: wrap;
+  margin-top: 0;
+  border-top: none;
 }
 .sh-star {
   font-size: 14px;
-  color: #f39c12;
-  margin-right: 1px;
-}
-.sh-num {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1a1a2e;
+  color: #ffd54f;
   margin-right: 2px;
 }
+.sh-num {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin-right: 0;
+}
 .sh-lbl {
-  font-size: 11px;
-  color: #9a9aae;
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
 }
 .sh-gap {
-  width: 12px;
+  width: 1px;
+  height: 14px;
+  background: rgba(255,255,255,0.2);
+  margin: 0 10px;
 }
 .sh-total {
   margin-left: auto;
   font-size: 12px;
-  color: #9a9aae;
+  color: rgba(255,255,255,0.7);
 }
 
 .sh-loading {
   padding: 60px 0;
 }
 
+/* ── Sticky NavBar ── */
+.shop-navbar-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 101;
+}
+
 /* ── Tabs ── */
 .shop-tabs :deep(.van-tabs__wrap) {
+  position: sticky;
+  top: 46px;
+  z-index: 100;
   background: #fff;
 }
 .shop-tabs :deep(.van-tab) {
@@ -458,6 +512,11 @@ watch(() => route.params.id, (newId) => {
   border-color: #e8573a;
   font-weight: 500;
 }
+.filter-count {
+  font-style: normal;
+  font-size: 11px;
+  margin-left: 3px;
+}
 .review-list {
   display: flex;
   flex-direction: column;
@@ -491,24 +550,38 @@ watch(() => route.params.id, (newId) => {
   min-width: 0;
 }
 .review-username {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #1a1a2e;
   display: block;
 }
 .review-time {
-  font-size: 11px;
-  color: #c8c4c0;
+  font-size: 12px;
+  color: #9a9aae;
 }
 .review-stars {
   flex-shrink: 0;
   display: flex;
-  gap: 1px;
+  gap: 2px;
 }
 .review-content {
-  font-size: 13px;
+  font-size: 14px;
   color: #1a1a2e;
-  line-height: 1.5;
+  line-height: 1.6;
+}
+.review-spec-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.review-spu,
+.review-sku {
+  font-size: 12px;
+  color: #5a5a6e;
+  background: #f5f3f0;
+  padding: 3px 10px;
+  border-radius: 4px;
 }
 .review-images {
   display: flex;

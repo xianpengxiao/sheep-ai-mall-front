@@ -81,8 +81,8 @@
         <div class="detail-grid">
           <div class="detail-item"><span class="detail-label">真实姓名</span><span class="detail-val">{{ detailUser.realName || '--' }}</span></div>
           <div class="detail-item"><span class="detail-label">性别</span><span class="detail-val">{{ genderText(detailUser.gender) }}</span></div>
-          <div class="detail-item"><span class="detail-label">手机号</span><span class="detail-val">{{ detailUser.phone ? maskPhone(detailUser.phone) : '--' }}</span></div>
-          <div class="detail-item"><span class="detail-label">邮箱</span><span class="detail-val">{{ detailUser.email ? maskEmail(detailUser.email) : '--' }}</span></div>
+          <div class="detail-item"><span class="detail-label">手机号</span><span class="detail-val">{{ detailUser.phone || '--' }}</span></div>
+          <div class="detail-item"><span class="detail-label">邮箱</span><span class="detail-val">{{ detailUser.email || '--' }}</span></div>
           <div class="detail-item"><span class="detail-label">生日</span><span class="detail-val">{{ detailUser.birthday || '--' }}</span></div>
           <div class="detail-item"><span class="detail-label">身份证</span><span class="detail-val">{{ detailUser.idCard || '--' }}</span></div>
           <div class="detail-item"><span class="detail-label">个性签名</span><span class="detail-val detail-sig">{{ detailUser.signature || '--' }}</span></div>
