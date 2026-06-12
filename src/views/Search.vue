@@ -651,6 +651,8 @@ async function loadCategoryTree() {
   margin-top: 2px;
   padding: 16px 10px 20px;
   min-height: 60vh;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .results-header {
   padding: 0 6px 12px;
@@ -674,10 +676,10 @@ async function loadCategoryTree() {
   vertical-align: -2px;
 }
 
-/* 商品网格 */
+/* 商品网格 — 固定 6 列 260px，超出横向滚动 */
 .goods-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(6, 260px);
   gap: 12px;
 }
 
@@ -779,10 +781,6 @@ async function loadCategoryTree() {
   .search-top-bar {
     padding: 12px 20px;
   }
-  .goods-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-  }
   .results-section {
     padding: 20px 16px 24px;
   }
@@ -795,20 +793,12 @@ async function loadCategoryTree() {
   .search-top-bar {
     padding: 12px 32px;
   }
-  .goods-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-  }
   .results-section {
     padding: 24px 24px 28px;
   }
 }
 
 @media (min-width: 1200px) {
-  .goods-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
-  }
   .results-section {
     max-width: 1400px;
     margin-left: auto;

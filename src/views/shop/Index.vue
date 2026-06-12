@@ -470,24 +470,15 @@ watch(() => route.params.id, (newId) => {
 /* ── Tab 内容 ── */
 .tab-content {
   padding: 12px 12px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* ── 商品网格（主页风格） ── */
+/* ── 商品网格（固定 6 列 260px，超出横向滚动） ── */
 .goods-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(6, 260px);
   gap: 12px;
-}
-
-@media (min-width: 640px) {
-  .goods-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-@media (min-width: 1024px) {
-  .goods-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 /* ── 评价 ── */

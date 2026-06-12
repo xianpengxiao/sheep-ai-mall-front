@@ -49,6 +49,8 @@ function goDetail() {
 
 <style scoped>
 .goods-card {
+  width: 260px;
+  flex-shrink: 0;
   background: #fff;
   border-radius: 14px;
   overflow: hidden;

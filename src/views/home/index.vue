@@ -1043,6 +1043,8 @@ async function onLoad() {
   flex: 1;
   padding: 12px 10px;
   background: #fff;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 子分类标签 */
@@ -1070,18 +1072,15 @@ async function onLoad() {
   box-shadow: 0 2px 8px rgba(232,87,58,0.3);
 }
 
-/* 商品网格 — 响应式 */
+/* 商品网格 — 固定 6 列 260px，超出横向滚动 */
 .goods-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(6, 260px);
   gap: 12px;
 }
 
 /* ── PC 端适配 ── */
 @media (min-width: 640px) {
-  .goods-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
   .sidebar {
     width: 120px;
   }
@@ -1120,19 +1119,8 @@ async function onLoad() {
 }
 
 @media (min-width: 900px) {
-  .goods-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-  }
   .sidebar {
     width: 160px;
-  }
-}
-
-@media (min-width: 1200px) {
-  .goods-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
   }
 }
 </style>
