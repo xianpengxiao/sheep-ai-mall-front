@@ -24,7 +24,6 @@
           <div class="sh-meta">{{ shopInfo.contactPhone || shopInfo.contactName }}</div>
           <div class="sh-scope-row">
             <span class="sh-scope">{{ scopeDisplayText || '未设置经营范围' }}</span>
-            <van-button size="mini" round plain class="modify-btn-shop" @click="openScopeDirectly">修改</van-button>
           </div>
         </div>
         <div class="sh-actions">
@@ -153,6 +152,7 @@
       <van-tab title="商品管理" name="goods" />
       <van-tab title="订单管理" name="orders" />
       <van-tab title="数据评价" name="data" />
+      <van-tab title="资金管理" name="fund" />
     </van-tabs>
 
     <div v-show="activeTab === 'goods'" class="tab-content">
@@ -395,6 +395,18 @@
       </van-action-sheet>
     </div>
 
+    <!-- ==================== Tab 资金管理 ==================== -->
+    <div v-show="activeTab === 'fund'" class="tab-content">
+      <div class="fund-sub-tabs">
+        <span v-for="st in fundSubTabs" :key="st.key" class="fund-sub-tab" :class="{ active: fundActiveSub === st.key }" @click="fundActiveSub = st.key">{{ st.label }}</span>
+      </div>
+      <AccountFund v-show="fundActiveSub === 'account'" ref="accountFundRef" @go-withdraw="fundActiveSub = 'withdraw'" />
+      <WithdrawFund v-show="fundActiveSub === 'withdraw'" ref="withdrawFundRef" />
+      <FlowFund v-show="fundActiveSub === 'flow'" />
+      <CommissionFund v-show="fundActiveSub === 'commission'" />
+      <ReportFund v-show="fundActiveSub === 'report'" />
+    </div>
+
     <!-- ==================== Tab 数据评价 ==================== -->
     <div v-show="activeTab === 'data'" class="tab-content">
       <!-- 营收概览 -->
@@ -410,6 +422,10 @@
         <div class="revenue-card">
           <div class="revenue-num">{{ stats.totalOrderCount ?? 0 }}</div>
           <div class="revenue-lbl">总订单</div>
+        </div>
+        <div class="revenue-card" style="border:1px solid #e8f8ee;">
+          <div class="revenue-num" style="color:#07c160;">¥{{ fundAvailableBalance ?? stats.availableBalance ?? '0.00' }}</div>
+          <div class="revenue-lbl">可提现余额</div>
         </div>
       </div>
       <!-- DSR 评分概览 -->
@@ -508,6 +524,12 @@ import { useRouter } from 'vue-router'
 import NavBar from '../../components/NavBar.vue'
 import GoodsForm from '../../components/goods/GoodsForm.vue'
 import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage, getDsrTrend, updateShopStatus, publishGoods, toggleMerchantGoodsStatus } from '../../api/merchant.js'
+import AccountFund from './fund/Account.vue'
+import WithdrawFund from './fund/Withdraw.vue'
+import FlowFund from './fund/Flow.vue'
+import CommissionFund from './fund/Commission.vue'
+import ReportFund from './fund/Report.vue'
+import { getBalance as getFundBalance } from '../../api/merchant_fund.js'
 import { getSpuDetail, deleteSpu } from '../../api/goods.js'
 import { getOrderDetail, deliverOrder } from '../../api/order.js'
 import { getMyCategories } from '../../api/merchant.js'
@@ -518,6 +540,15 @@ const defaultImg = 'https://img.yzcdn.cn/vant/ipad.jpeg'
 const defaultLogo = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23e8573a' rx='16'/%3E%3Ctext x='50' y='66' text-anchor='middle' font-size='44' fill='%23fff'%3E🏪%3C/text%3E%3C/svg%3E"
 
 const activeTab = ref('goods')
+const fundSubTabs = [
+  { key: 'account', label: '结算账户' },
+  { key: 'withdraw', label: '提现' },
+  { key: 'flow', label: '资金流水' },
+  { key: 'commission', label: '分佣明细' },
+  { key: 'report', label: '经营报表' },
+]
+const accountFundRef = ref(null)
+const withdrawFundRef = ref(null)
 
 // 经营范围选择
 const showScopePicker = ref(false)
@@ -1063,7 +1094,9 @@ async function confirmDeliver() {
 }
 
 // ═══════════════ 数据评价 ═══════════════
-const stats = ref({ totalAmount: 0, monthAmount: 0, totalOrderCount: 0 })
+const stats = ref({ totalAmount: 0, monthAmount: 0, totalOrderCount: 0, availableBalance: 0 })
+const fundAvailableBalance = ref(null)
+const fundActiveSub = ref('account')
 const dsr = ref({})
 const dsrTrend = ref([])
 const reviewList = ref([])
@@ -1165,9 +1198,15 @@ watch(activeTab, (tab) => {
   if (tab === 'data') {
     fetchDsr()
     getShopStats().then(data => { stats.value = data }).catch(() => {})
+    getFundBalance().then(v => { fundAvailableBalance.value = v }).catch(() => {})
     if (reviewList.value.length === 0) {
       reviewPage.value = 1; fetchReviews()
     }
+  }
+  if (tab === 'fund') {
+    accountFundRef.value?.fetchAccount?.()
+    accountFundRef.value?.fetchBalance?.()
+    withdrawFundRef.value?.fetchBalance?.()
   }
 })
 
@@ -2043,4 +2082,28 @@ onActivated(() => {
     border-left: none;
   }
 }
+/* ── 资金管理子标签 ── */
+.fund-sub-tabs {
+  display: flex;
+  gap: 12px;
+  padding: 0 0 8px;
+  border-bottom: 1.5px solid #eeeae6;
+  margin-bottom: 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.fund-sub-tab {
+  font-size: 13px;
+  font-weight: 500;
+  color: #5a5a6e;
+  cursor: pointer;
+  padding: 6px 0 8px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s;
+  user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.fund-sub-tab:hover { color: #1a1a2e; }
+.fund-sub-tab.active { color: #1a1a2e; font-weight: 600; border-bottom-color: #e8573a; }
 </style>

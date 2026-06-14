@@ -230,6 +230,7 @@ function maskEmail(e) {
 function roleName(r) {
   const raw = typeof r === 'string' ? r : (r.roleName || r.roleCode || '')
   if (raw.includes('ADMIN') || raw.includes('admin') || raw.includes('超级管理员')) return '管理员'
+  if (raw.includes('OPERATOR') || raw.includes('operator') || raw.includes('运营')) return '运营人员'
   if (raw.includes('MERCHANT') || raw.includes('merchant') || raw.includes('商家')) return '商家'
   if (raw.includes('VIEWER') || raw.includes('viewer') || raw.includes('普通')) return '普通用户'
   return raw
@@ -237,6 +238,7 @@ function roleName(r) {
 function roleClass(r) {
   const raw = typeof r === 'string' ? r : (r.roleName || r.roleCode || '')
   if (raw.includes('ADMIN') || raw.includes('admin') || raw.includes('超级管理员')) return 'role-admin'
+  if (raw.includes('OPERATOR') || raw.includes('operator') || raw.includes('运营')) return 'role-operator'
   if (raw.includes('MERCHANT') || raw.includes('merchant') || raw.includes('商家')) return 'role-merchant'
   return 'role-user'
 }
@@ -408,6 +410,7 @@ onMounted(loadData)
   border-radius: 4px; font-weight: 500;
 }
 .role-admin { background: #fdecea; color: #c62828; }
+.role-operator { background: #e3f2fd; color: #1565c0; }
 .role-merchant { background: #fff3e0; color: #e65100; }
 .role-user { background: #f0ece8; color: #5a5a6e; }
 

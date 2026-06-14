@@ -19,6 +19,8 @@
       <GoodsManageTab v-if="activeTab === 'goods'" />
       <MerchantTab v-if="activeTab === 'merchant'" />
       <ReviewTab v-if="activeTab === 'review'" />
+      <FundTab v-if="activeTab === 'fund'" />
+      <CategoryTab v-if="activeTab === 'category'" />
     </div>
   </div>
 </template>
@@ -30,6 +32,8 @@ import SystemTab from './tabs/SystemTab.vue'
 import GoodsManageTab from './tabs/GoodsManageTab.vue'
 import MerchantTab from './tabs/MerchantTab.vue'
 import ReviewTab from './tabs/ReviewTab.vue'
+import FundTab from './tabs/FundTab.vue'
+import CategoryTab from './tabs/CategoryTab.vue'
 
 const activeTab = ref('sys')
 
@@ -38,6 +42,8 @@ const tabs = [
   { key: 'goods', label: '商品管理' },
   { key: 'merchant', label: '商家管理' },
   { key: 'review', label: '评价管理' },
+  { key: 'fund', label: '资金管理' },
+  { key: 'category', label: '分类管理' },
 ]
 </script>
 
