@@ -97,14 +97,6 @@
 
         <!-- 底部功能链接 -->
         <div class="bottom-links">
-          <span class="bottom-link" @click="handleThirdLogin('wechat')">
-            <van-icon name="wechat" size="16" color="#07c160" /> 微信
-          </span>
-          <span class="link-divider">|</span>
-          <span class="bottom-link" @click="handleThirdLogin('qq')">
-            <van-icon name="qq" size="16" color="#1989fa" /> QQ
-          </span>
-          <span class="link-divider">|</span>
           <span class="bottom-link" @click="$router.push('/forgot')">忘记密码</span>
           <span class="link-divider">|</span>
           <router-link to="/register" class="bottom-link register-link">立即注册</router-link>
@@ -223,9 +215,6 @@ function handleBack() {
   else router.push('/')
 }
 
-function handleThirdLogin(provider) {
-  showToast(provider === 'wechat' ? '微信登录开发中' : 'QQ登录开发中')
-}
 </script>
 
 <style scoped>

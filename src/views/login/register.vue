@@ -146,7 +146,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { checkPhone, sendRegisterCode, verifyCode, sendEmailCode, verifyEmailCode, register as registerApi } from '../../api/member.js'
@@ -284,13 +284,17 @@ async function handleStep2() {
     } else {
       await registerApi({ ...data, email: email.value })
     }
-    showToast('注册成功')
-    router.push('/login')
+    onRegisterDone()
   } catch (e) {
     // 后端已通过拦截器弹 toast
   } finally {
     step2Loading.value = false
   }
+}
+
+function onRegisterDone() {
+  showToast('注册成功')
+  router.push('/login')
 }
 
 function cancelRegister() {
@@ -308,6 +312,9 @@ function handleBack() {
   if (window.history.length > 1) router.back()
   else router.push('/')
 }
+
+// keep-alive 缓存导致再次进入时仍显示 Step 2，每次激活都重置到 Step 1
+onActivated(() => { cancelRegister() })
 </script>
 
 <style scoped>
