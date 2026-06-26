@@ -18,15 +18,21 @@
           <div class="step-dot" :class="{ active: step >= 2, done: step > 2 }">2</div>
         </div>
         <div class="step-labels">
-          <span class="step-label" :class="{ active: step >= 1 }">手机验证</span>
+          <span class="step-label" :class="{ active: step >= 1 }">{{ registerMode === 'phone' ? '手机验证' : '邮箱验证' }}</span>
           <span class="step-label" :class="{ active: step >= 2 }">填写账号</span>
         </div>
 
-        <!-- ══════ Step 1: 手机号 + 验证码 ══════ -->
+        <!-- ══════ Step 1: 手机/邮箱 验证 ══════ -->
         <template v-if="step === 1">
-          <div class="step-title">验证手机号</div>
+          <!-- 注册方式切换 -->
+          <div class="mode-tabs">
+            <span class="mode-tab" :class="{ active: registerMode === 'phone' }" @click="switchMode('phone')">手机验证</span>
+            <span class="mode-tab" :class="{ active: registerMode === 'email' }" @click="switchMode('email')">邮箱验证</span>
+          </div>
+          <div class="step-title">{{ registerMode === 'phone' ? '验证手机号' : '验证邮箱' }}</div>
           <van-form @submit="handleStep1" ref="form1Ref" class="step-form">
-            <div class="field-group">
+            <!-- 手机号输入 -->
+            <div class="field-group" v-if="registerMode === 'phone'">
               <van-field
                 v-model="phone"
                 name="phone"
@@ -37,18 +43,29 @@
                 type="tel"
               />
             </div>
+            <!-- 邮箱输入 -->
+            <div class="field-group" v-else>
+              <van-field
+                v-model="email"
+                name="email"
+                placeholder="邮箱地址"
+                :rules="[{ required: true, message: '请输入邮箱' }, { pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: '邮箱格式不正确' }]"
+                clearable
+                type="email"
+              />
+            </div>
             <div class="field-group code-group">
               <van-field
                 v-model="code"
                 name="code"
-                placeholder="请输入6位验证码"
+                :placeholder="registerMode === 'phone' ? '请输入6位验证码' : '请输入邮箱验证码'"
                 :rules="codeRules"
                 maxlength="6"
                 clearable
                 class="code-field"
               >
                 <template #button>
-                  <span class="code-btn" :class="{ disabled: codeCountdown > 0 }" @click="handleSendCode">
+                  <span class="code-btn" :class="{ disabled: codeCountdown > 0 || step1Loading }" @click="handleSendCode">
                     {{ codeCountdown > 0 ? codeCountdown + 's' : codeSent ? '重新发送' : '获取验证码' }}
                   </span>
                 </template>
@@ -112,17 +129,8 @@
                 clearable
               />
             </div>
-            <div class="field-group">
-              <van-field
-                v-model="registerForm.email"
-                name="email"
-                placeholder="邮箱（选填）"
-                :rules="[{ validator: (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), message: '邮箱格式不正确', trigger: 'onBlur' }]"
-                clearable
-              />
-            </div>
-            <!-- 手机号固定显示 -->
-            <div class="phone-display">手机号：{{ maskedPhone }}</div>
+            <!-- 手机号/邮箱固定显示 -->
+            <div class="phone-display">{{ registerMode === 'phone' ? '手机号' : '邮箱' }}：{{ maskedContact }}</div>
             <van-button round block native-type="submit" class="step-btn" :loading="step2Loading">完成注册</van-button>
           </van-form>
           <div class="step-back" @click="cancelRegister">取消注册</div>
@@ -141,14 +149,16 @@
 import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
-import { checkPhone, sendRegisterCode, verifyCode, register as registerApi } from '../../api/member.js'
+import { checkPhone, sendRegisterCode, verifyCode, sendEmailCode, verifyEmailCode, register as registerApi } from '../../api/member.js'
 
 const router = useRouter()
 
 const step = ref(1)
+const registerMode = ref('phone') // 'phone' | 'email'
 
 // Step 1
 const phone = ref('')
+const email = ref('')
 const code = ref('')
 const codeCountdown = ref(0)
 const codeSent = ref(false)
@@ -173,35 +183,56 @@ const registerForm = reactive({
   email: '',
 })
 
-const maskedPhone = ref('')
+const maskedContact = ref('')
+
+// ── 切换注册方式 ──
+function switchMode(mode) {
+  if (step.value !== 1) return // 仅第一步可切换
+  registerMode.value = mode
+  code.value = ''
+  codeSent.value = false
+}
 
 // ── Step 1: 处理发送验证码 ──
 async function handleSendCode() {
-  if (codeCountdown.value > 0) return
-  if (!/^1[3-9]\d{9}$/.test(phone.value)) {
-    showToast('请输入正确的手机号')
-    return
+  if (codeCountdown.value > 0 || step1Loading.value) return
+  if (registerMode.value === 'phone') {
+    if (!/^1[3-9]\d{9}$/.test(phone.value)) {
+      showToast('请输入正确的手机号')
+      return
+    }
+  } else {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+      showToast('请输入正确的邮箱地址')
+      return
+    }
   }
   step1Loading.value = true
   try {
-    const exists = await checkPhone(phone.value)
-    if (exists) {
-      showToast('该手机号已注册')
-      return
+    if (registerMode.value === 'phone') {
+      const exists = await checkPhone(phone.value)
+      if (exists) {
+        showToast('该手机号已注册')
+        return
+      }
+      await sendRegisterCode(phone.value)
+      maskedContact.value = phone.value.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+    } else {
+      await sendEmailCode(email.value)
+      maskedContact.value = email.value.replace(/^(.{2}).+(.{2}@.+)$/, '$1****$2')
     }
-    await sendRegisterCode(phone.value)
+    // 后台发送成功后才开始计时
     showToast('验证码已发送')
     startCountdown()
     codeSent.value = true
-    maskedPhone.value = phone.value.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
   } catch (e) {
-    // 拦截器已弹 toast（如"验证码已发送，请60秒后重试"），不再重复提示
+    // 拦截器已弹 toast
   } finally {
     step1Loading.value = false
   }
 }
 
-// ── Step 1: 提交（仅校验验证码 → 进入 Step 2） ──
+// ── Step 1: 提交（校验验证码 → 进入 Step 2） ──
 async function handleStep1() {
   if (!codeSent.value) {
     showToast('请先获取验证码')
@@ -213,7 +244,12 @@ async function handleStep1() {
   }
   step1Loading.value = true
   try {
-    const ok = await verifyCode(phone.value, code.value)
+    let ok
+    if (registerMode.value === 'phone') {
+      ok = await verifyCode(phone.value, code.value)
+    } else {
+      ok = await verifyEmailCode(email.value, code.value)
+    }
     if (ok) {
       step.value = 2
     } else {
@@ -243,7 +279,11 @@ async function handleStep2() {
   step2Loading.value = true
   try {
     const { confirmPwd, ...data } = registerForm
-    await registerApi({ ...data, phone: phone.value })
+    if (registerMode.value === 'phone') {
+      await registerApi({ ...data, phone: phone.value })
+    } else {
+      await registerApi({ ...data, email: email.value })
+    }
     showToast('注册成功')
     router.push('/login')
   } catch (e) {
@@ -254,8 +294,6 @@ async function handleStep2() {
 }
 
 function cancelRegister() {
-  // 回到第一步，保留手机号和倒计时（后端有60s发送冷却），
-  // 重置验证码状态，倒计时结束后可重新获取
   step.value = 1
   code.value = ''
   codeSent.value = false
@@ -318,6 +356,11 @@ function handleBack() {
   background-clip: text;
   margin-bottom: 24px;
 }
+
+/* ── 注册方式切换 ── */
+.mode-tabs { display: flex; border-radius: 8px; background: #f0ece8; padding: 3px; margin-bottom: 16px; }
+.mode-tab { flex: 1; text-align: center; padding: 6px 0; font-size: 13px; font-weight: 500; color: #9a9aae; border-radius: 6px; cursor: pointer; transition: all 0.25s; user-select: none; }
+.mode-tab.active { background: #fff; color: #1a1a2e; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
 
 /* ── 步骤指示器（2步） ── */
 .step-indicator {

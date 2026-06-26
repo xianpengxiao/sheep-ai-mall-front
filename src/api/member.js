@@ -92,9 +92,9 @@ export function bindPhone(data) {
   return request.put('/auth/phone', data)
 }
 
-/** 发送邮箱验证码 */
+/** 发送邮箱验证码（发送较慢，使用 30s 超时） */
 export function sendEmailCode(email) {
-  return request.post('/auth/send-email', null, { params: { email } })
+  return request.post('/auth/send-email', null, { params: { email }, timeout: 30000 })
 }
 
 /** 绑定/更换邮箱 */
@@ -121,7 +121,7 @@ export function checkEmail(email) {
 
 /** 校验邮箱验证码 */
 export function verifyEmailCode(email, code) {
-  return request.post('/auth/verify-email-code', { email, code })
+  return request.post('/auth/verify-email-code', null, { params: { email, code } })
 }
 
 /** 重置密码（手机或邮箱） */

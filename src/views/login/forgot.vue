@@ -53,7 +53,7 @@
                   maxlength="6"
                 >
                   <template #button>
-                    <span class="send-code-btn" :class="{ disabled: countdown > 0 }" @click="sendCode">
+                    <span class="send-code-btn" :class="{ disabled: countdown > 0 || sendingCode }" @click="sendCode">
                       {{ countdown > 0 ? countdown + 's' : '发送验证码' }}
                     </span>
                   </template>
@@ -144,6 +144,7 @@ const confirmPassword = ref('')
 // 加载状态
 const verifyLoading = ref(false)
 const submitting = ref(false)
+const sendingCode = ref(false)
 
 function handleBack() {
   if (step.value === 2 && !success.value) {
@@ -172,9 +173,10 @@ function clearCountdown() {
 
 // ── 发送验证码：先检查账号是否存在，存在则发送 ──
 async function sendCode() {
-  if (countdown.value > 0) return
+  if (countdown.value > 0 || sendingCode.value) return
   if (!account.value) return showToast(type.value === 'phone' ? '请输入手机号' : '请输入邮箱地址')
 
+  sendingCode.value = true
   try {
     if (type.value === 'phone') {
       const exist = await checkPhone(account.value)
@@ -193,6 +195,8 @@ async function sendCode() {
     startCountdown()
   } catch {
     showToast('验证失败')
+  } finally {
+    sendingCode.value = false
   }
 }
 
