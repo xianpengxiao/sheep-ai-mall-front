@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SheepAI Mall - 首页 v1</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f8f9fb;
+  --surface: #ffffff;
+  --primary: #2d3436;
+  --primary-light: #636e72;
+  --accent: #e17055;
+  --accent-light: #fab1a0;
+  --price: #d63031;
+  --text: #2d3436;
+  --text-secondary: #636e72;
+  --text-muted: #b2bec3;
+  --border: #e9ecef;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+/* ── 顶部导航栏 ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface);
+  position: sticky; top:0; z-index:100;
+}
+.brand {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.5px;
+}
+.brand span { color: var(--accent); }
+.top-actions { display:flex; gap:16px; }
+.top-actions .icon-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background 0.2s;
+}
+.top-actions .icon-btn:hover { background: #e9ecef; }
+.badge {
+  position: absolute;
+  top: -2px; right: -2px;
+  width: 18px; height: 18px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── 搜索栏 ── */
+.search-wrap { padding: 8px 16px 12px; background: var(--surface); }
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+  border: 1.5px solid transparent;
+}
+.search-bar:hover, .search-bar:focus-within {
+  box-shadow: var(--shadow);
+  border-color: var(--accent-light);
+}
+.search-bar .icon { font-size: 18px; color: var(--text-muted); }
+.search-bar span { color: var(--text-muted); font-size: 14px; flex:1; }
+
+/* ── 品类快速入口 ── */
+.quick-cats {
+  padding: 0 16px 12px;
+  background: var(--surface);
+}
+.quick-cats-scroll {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.quick-cats-scroll::-webkit-scrollbar { display:none; }
+.quick-cat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.quick-cat-item:active { transform: scale(0.95); }
+.quick-cat-icon {
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+.quick-cat-item.active .quick-cat-icon {
+  background: #fff5f3;
+}
+.quick-cat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.quick-cat-item.active .quick-cat-label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── 分割线 ── */
+.divider {
+  height: 8px;
+  background: var(--bg);
+}
+
+/* ── 主体：分类 + 商品 ── */
+.main-section {
+  display: flex;
+  min-height: 60vh;
+}
+
+/* 左侧分类 */
+.sidebar {
+  width: 90px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
+}
+.sidebar-item {
+  padding: 14px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+.sidebar-item.active {
+  color: var(--accent);
+  font-weight: 700;
+  background: #fff5f3;
+}
+.sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+}
+
+/* 右侧 */
+.content-area {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
+}
+
+/* 子分类标签 */
+.sub-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+.sub-tag {
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  border: 1px solid var(--border);
+}
+.sub-tag.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* 商品网格 */
+.goods-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.goods-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+.goods-card:active { transform: scale(0.97); }
+.goods-card:hover { box-shadow: var(--shadow); }
+.goods-img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: var(--bg);
+}
+.goods-info { padding: 10px; }
+.goods-name {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.goods-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.goods-price {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--price);
+}
+.goods-sales {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── 底部 TabBar ── */
+.tabbar {
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tabbar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.tabbar-item.active { color: var(--accent); }
+.tabbar-item .icon { font-size: 22px; }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<div class="top-bar">
+  <div class="brand">Sheep<span>AI</span> Mall</div>
+  <div class="top-actions">
+    <button class="icon-btn">🛒<span class="badge">2</span></button>
+    <button class="icon-btn">👤</button>
+  </div>
+</div>
+
+<!-- 搜索栏 -->
+<div class="search-wrap">
+  <div class="search-bar">
+    <span class="icon">🔍</span>
+    <span>搜索你想找的商品...</span>
+  </div>
+</div>
+
+<!-- 品类快速入口 -->
+<div class="quick-cats">
+  <div class="quick-cats-scroll">
+    <div class="quick-cat-item active">
+      <div class="quick-cat-icon">📱</div><span class="quick-cat-label">推荐</span>
+    </div>
+    <div class="quick-cat-item">
+      <div class="quick-cat-icon">👗</div><span class="quick-cat-label">服饰</span>
+    </div>
+    <div class="quick-cat-item">
+      <div class="quick-cat-icon">👟</div><span class="quick-cat-label">鞋靴</span>
+    </div>
+    <div class="quick-cat-item">
+      <div class="quick-cat-icon">💻</div><span class="quick-cat-label">数码</span>
+    </div>
+    <div class="quick-cat-item">
+      <div class="quick-cat-icon">🏠</div><span class="quick-cat-label">家居</span>
+    </div>
+    <div class="quick-cat-item">
+      <div class="quick-cat-icon">💄</div><span class="quick-cat-label">美妆</span>
+    </div>
+    <div class="quick-cat-item">
+      <div class="quick-cat-icon">🍜</div><span class="quick-cat-label">食品</span>
+    </div>
+    <div class="quick-cat-item">
+      <div class="quick-cat-icon">🎮</div><span class="quick-cat-label">游戏</span>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- 主体 -->
+<div class="main-section">
+  <div class="sidebar">
+    <div class="sidebar-item active">推荐</div>
+    <div class="sidebar-item">手机</div>
+    <div class="sidebar-item">电脑</div>
+    <div class="sidebar-item">家电</div>
+    <div class="sidebar-item">服饰</div>
+    <div class="sidebar-item">美妆</div>
+    <div class="sidebar-item">运动</div>
+    <div class="sidebar-item">生鲜</div>
+  </div>
+
+  <div class="content-area">
+    <div class="sub-tags">
+      <span class="sub-tag active">全部</span>
+      <span class="sub-tag">5G手机</span>
+      <span class="sub-tag">折叠屏</span>
+      <span class="sub-tag">游戏手机</span>
+      <span class="sub-tag">千元机</span>
+    </div>
+
+    <div class="goods-grid" id="goodsGrid"></div>
+  </div>
+</div>
+
+<!-- 底部 TabBar -->
+<div class="tabbar">
+  <div class="tabbar-item active">
+    <span class="icon">🏠</span>首页
+  </div>
+  <div class="tabbar-item">
+    <span class="icon">🛒</span>购物车
+  </div>
+  <div class="tabbar-item">
+    <span class="icon">👤</span>我的
+  </div>
+</div>
+
+<script>
+const goods = [
+  { name:'iPhone 15 Pro Max 256GB 原色钛金属', price:8999, sales:1234, img:'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=400&h=400&fit=crop' },
+  { name:'华为 Mate 60 Pro 昆仑玻璃版', price:6999, sales:2345, img:'https://images.unsplash.com/photo-1605236453806-6ff36851218e?w=400&h=400&fit=crop' },
+  { name:'小米14 Ultra 徕卡光学镜头', price:5999, sales:3456, img:'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&h=400&fit=crop' },
+  { name:'Samsung Galaxy S24 Ultra', price:9699, sales:987, img:'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=400&fit=crop' },
+  { name:'OPPO Find X7 Ultra 卫星通信', price:4999, sales:2100, img:'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=400&h=400&fit=crop' },
+  { name:'vivo X100 Pro 蔡司APO长焦', price:4299, sales:1876, img:'https://images.unsplash.com/photo-1546054454-aa26e2b734c7?w=400&h=400&fit=crop' },
+]
+
+const grid = document.getElementById('goodsGrid')
+goods.forEach(g => {
+  grid.innerHTML += `
+    <div class="goods-card">
+      <img class="goods-img" src="${g.img}" alt="${g.name}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><rect fill=%22%23e9ecef%22 width=%22200%22 height=%22200%22/><text x=%22100%22 y=%22100%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23b2bec3%22 font-size=%2214%22>暂无图片</text></svg>'">
+      <div class="goods-info">
+        <div class="goods-name">${g.name}</div>
+        <div class="goods-footer">
+          <span class="goods-price">&yen;${g.price}</span>
+          <span class="goods-sales">已售 ${g.sales}</span>
+        </div>
+      </div>
+    </div>`
+})
+
+// 左侧分类切换
+document.querySelectorAll('.sidebar-item').forEach(el => {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'))
+    this.classList.add('active')
+  })
+})
+
+// 子分类切换
+document.querySelectorAll('.sub-tag').forEach(el => {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.sub-tag').forEach(e => e.classList.remove('active'))
+    this.classList.add('active')
+  })
+})
+
+// 顶部品类切换
+document.querySelectorAll('.quick-cat-item').forEach(el => {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.quick-cat-item').forEach(e => e.classList.remove('active'))
+    this.classList.add('active')
+  })
+})
+
+// TabBar 切换
+document.querySelectorAll('.tabbar-item').forEach(el => {
+  el.addEventListener('click', function() {
+    document.querySelectorAll('.tabbar-item').forEach(e => e.classList.remove('active'))
+    this.classList.add('active')
+  })
+})
+</script>
+</body>
+</html>

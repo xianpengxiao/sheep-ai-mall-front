@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SheepAI Mall - 首页 v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f3f0;
+  --surface: #ffffff;
+  --primary: #1a1a2e;
+  --accent: #e8573a;
+  --accent2: #f39c12;
+  --gradient-warm: linear-gradient(135deg, #e8573a 0%, #f39c12 100%);
+  --gradient-cool: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --price: #d63031;
+  --text: #1a1a2e;
+  --text-secondary: #5a5a6e;
+  --text-muted: #9a9aae;
+  --border: #eeeae6;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-hover: 0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.10);
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'DM Sans', 'Inter', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: var(--font);
+  background: linear-gradient(180deg, #faf8f6 0%, #f5f3f0 100%);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* ── 顶部 ── */
+.top-bar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 14px 16px 10px;
+  background: linear-gradient(180deg, #fff 0%, #fff 100%);
+  position: sticky; top:0; z-index:100;
+}
+.brand {
+  font-family: var(--font-display);
+  font-size: 24px; font-weight: 700; letter-spacing: -0.8px;
+  background: var(--gradient-warm);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.top-actions { display:flex; gap:12px; }
+.icon-btn {
+  width:38px; height:38px; border-radius:50%;
+  background: var(--bg); border:1.5px solid var(--border);
+  font-size:17px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  position:relative; transition: all 0.2s;
+}
+.icon-btn:hover { border-color: var(--accent); background: #fff; }
+.badge {
+  position:absolute; top:-4px; right:-4px;
+  min-width:18px; height:18px; padding:0 5px;
+  background: var(--gradient-warm);
+  color:#fff; font-size:10px; font-weight:700;
+  border-radius:9px; display:flex; align-items:center; justify-content:center;
+}
+
+/* ── 搜索栏 ── */
+.search-wrap { padding: 6px 16px 14px; background: #fff; }
+.search-bar {
+  display:flex; align-items:center; gap:10px;
+  padding: 12px 18px; background: var(--bg);
+  border-radius: 28px; cursor:pointer;
+  transition: all 0.25s;
+  border: 2px solid transparent;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.search-bar:hover { border-color: #fdd; box-shadow: 0 2px 12px rgba(232,87,58,0.08); }
+.search-bar .icon { font-size:17px; }
+.search-bar span { color: var(--text-muted); font-size:14px; flex:1; }
+
+/* ── Banner ── */
+.banner-wrap { padding: 0 16px 14px; background:#fff; }
+.banner {
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  background: var(--gradient-warm);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+}
+.banner::after {
+  content: '';
+  position: absolute;
+  right: -20px; top: -20px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.12);
+}
+.banner-text h3 { font-size:18px; font-weight:700; margin-bottom:4px; }
+.banner-text p { font-size:13px; opacity:0.9; }
+.banner-emoji { font-size:48px; position:relative; z-index:1; }
+
+/* ── 品类入口 ── */
+.quick-cats { padding: 0 16px 14px; background:#fff; }
+.quick-cats-scroll { display:flex; gap:18px; overflow-x:auto; scrollbar-width:none; }
+.quick-cats-scroll::-webkit-scrollbar { display:none; }
+.quick-cat-item {
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  flex-shrink:0; cursor:pointer; transition: transform 0.2s;
+  text-decoration: none;
+}
+.quick-cat-item:active { transform: scale(0.93); }
+.quick-cat-icon {
+  width:52px; height:52px; border-radius:16px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px;
+  background: var(--bg);
+  transition: all 0.2s;
+}
+.quick-cat-item.active .quick-cat-icon {
+  background: var(--gradient-warm);
+  box-shadow: 0 4px 14px rgba(232,87,58,0.25);
+}
+.quick-cat-label { font-size:12px; color:var(--text-secondary); font-weight:500; }
+.quick-cat-item.active .quick-cat-label { color:var(--accent); font-weight:700; }
+
+/* ── 分割 ── */
+.section-gap { height: 10px; background: transparent; }
+
+/* ── 主体 ── */
+.main-section { display:flex; min-height:55vh; }
+
+.sidebar {
+  width:86px; flex-shrink:0;
+  background: var(--surface);
+  border-radius: 0 var(--radius-lg) 0 0;
+  overflow-y:auto;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.02);
+}
+@media (min-width: 640px) { .sidebar { width: 120px; } }
+@media (min-width: 900px) { .sidebar { width: 160px; } }
+.sidebar-item {
+  padding:15px 6px; text-align:center;
+  font-size:13px; color:var(--text-secondary);
+  cursor:pointer; position:relative;
+  transition: all 0.2s; font-weight:500;
+  border-right: 3px solid transparent;
+}
+.sidebar-item.active {
+  color: var(--accent); font-weight:700;
+  background: linear-gradient(90deg, #fff5f3 0%, #fff 100%);
+  border-right-color: var(--accent);
+}
+
+.content-area {
+  flex:1; padding:12px 10px;
+  overflow-y:auto;
+  background: #fff;
+}
+
+/* 子分类 */
+.sub-tags { display:flex; flex-wrap:wrap; gap:8px; padding:0 0 14px; }
+.sub-tag {
+  padding:7px 16px; border-radius:18px;
+  font-size:12px; font-weight:600;
+  background:#f8f6f4; color:var(--text-secondary);
+  cursor:pointer; transition: all 0.2s;
+  border: 1.5px solid transparent;
+}
+.sub-tag.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(232,87,58,0.3);
+}
+
+/* 商品网格 */
+.goods-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (min-width: 640px) { .goods-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px) { .goods-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1200px) { .goods-grid { grid-template-columns: repeat(5, 1fr); } }
+.goods-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  overflow:hidden; cursor:pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-card);
+}
+.goods-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.goods-card:active { transform: scale(0.97); }
+.goods-img {
+  width:100%; aspect-ratio:1; object-fit:cover;
+  background: #f0ece8;
+}
+.goods-info { padding: 10px 12px 12px; }
+.goods-name {
+  font-size:13px; font-weight:600; line-height:1.35;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; color:var(--text); margin-bottom:8px;
+  letter-spacing: -0.2px;
+}
+.goods-footer { display:flex; align-items:center; justify-content:space-between; }
+.goods-price { font-family:var(--font-display); font-size:17px; font-weight:700; color:var(--price); }
+.goods-sales { font-size:11px; color:var(--text-muted); background:var(--bg); padding:2px 8px; border-radius:10px; }
+
+/* ── 底部 ── */
+.tabbar {
+  display:flex; background:var(--surface);
+  border-top:1px solid var(--border);
+  position:sticky; bottom:0; z-index:100;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
+}
+.tabbar-item {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:10px 0 8px; color:var(--text-muted);
+  cursor:pointer; font-size:11px; font-weight:600;
+  transition: color 0.2s;
+}
+.tabbar-item.active { color: var(--accent); }
+.tabbar-icon {
+  width:26px; height:26px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; transition: transform 0.2s;
+}
+.tabbar-item.active .tabbar-icon { transform: scale(1.1); }
+.tabbar-indicator {
+  position: absolute; top:-2px;
+  width: 20px; height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  display: none;
+}
+.tabbar-item.active .tabbar-indicator { display:block; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="brand">SheepAI Mall</div>
+  <div class="top-actions">
+    <button class="icon-btn">🛒<span class="badge">3</span></button>
+    <button class="icon-btn">👤</button>
+  </div>
+</div>
+
+<div class="search-wrap">
+  <div class="search-bar">
+    <span class="icon">🔍</span><span>搜索商品、品牌...</span>
+  </div>
+</div>
+
+<div class="banner-wrap">
+  <div class="banner">
+    <div class="banner-text">
+      <h3>🔥 夏日焕新季</h3>
+      <p>全场低至5折 · 限时特惠</p>
+    </div>
+    <span class="banner-emoji">🎁</span>
+  </div>
+</div>
+
+<div class="quick-cats">
+  <div class="quick-cats-scroll" id="quickCats">
+    <div class="quick-cat-item active"><div class="quick-cat-icon">⭐</div><span class="quick-cat-label">推荐</span></div>
+    <div class="quick-cat-item"><div class="quick-cat-icon">👗</div><span class="quick-cat-label">服饰</span></div>
+    <div class="quick-cat-item"><div class="quick-cat-icon">👟</div><span class="quick-cat-label">鞋靴</span></div>
+    <div class="quick-cat-item"><div class="quick-cat-icon">💻</div><span class="quick-cat-label">数码</span></div>
+    <div class="quick-cat-item"><div class="quick-cat-icon">🏠</div><span class="quick-cat-label">家居</span></div>
+    <div class="quick-cat-item"><div class="quick-cat-icon">💄</div><span class="quick-cat-label">美妆</span></div>
+    <div class="quick-cat-item"><div class="quick-cat-icon">🍜</div><span class="quick-cat-label">食品</span></div>
+    <div class="quick-cat-item"><div class="quick-cat-icon">🏀</div><span class="quick-cat-label">运动</span></div>
+  </div>
+</div>
+
+<div class="section-gap"></div>
+
+<div class="main-section">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-item active">推荐</div>
+    <div class="sidebar-item">手机数码</div>
+    <div class="sidebar-item">电脑办公</div>
+    <div class="sidebar-item">家用电器</div>
+    <div class="sidebar-item">服饰内衣</div>
+    <div class="sidebar-item">美妆护肤</div>
+    <div class="sidebar-item">运动户外</div>
+    <div class="sidebar-item">食品生鲜</div>
+    <div class="sidebar-item">图书文娱</div>
+  </div>
+
+  <div class="content-area">
+    <div class="sub-tags" id="subTags">
+      <span class="sub-tag active">🔥 热销</span>
+      <span class="sub-tag">📱 5G手机</span>
+      <span class="sub-tag">📐 折叠屏</span>
+      <span class="sub-tag">🎮 游戏手机</span>
+      <span class="sub-tag">💰 千元机</span>
+      <span class="sub-tag">📷 拍照旗舰</span>
+    </div>
+    <div class="goods-grid" id="goodsGrid"></div>
+  </div>
+</div>
+
+<div class="tabbar">
+  <div class="tabbar-item active"><div class="tabbar-indicator"></div><div class="tabbar-icon">🏠</div>首页</div>
+  <div class="tabbar-item"><div class="tabbar-indicator"></div><div class="tabbar-icon">🛒</div>购物车</div>
+  <div class="tabbar-item"><div class="tabbar-indicator"></div><div class="tabbar-icon">👤</div>我的</div>
+</div>
+
+<script>
+const goodsData = [
+  { name:'iPhone 15 Pro Max 256GB', price:8999, sales:4321, img:'https://images.unsplash.com/photo-1695048133142-1a20484d2569?w=400&h=400&fit=crop' },
+  { name:'华为 Mate 60 Pro+ 昆仑玻璃 512GB', price:7999, sales:3890, img:'https://images.unsplash.com/photo-1605236453806-6ff36851218e?w=400&h=400&fit=crop' },
+  { name:'小米14 Ultra 徕卡光学 骁龙8Gen3', price:5999, sales:5678, img:'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400&h=400&fit=crop' },
+  { name:'Samsung Galaxy S24 Ultra AI手机', price:9699, sales:2100, img:'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=400&h=400&fit=crop' },
+  { name:'OPPO Find X7 Ultra 卫星通信版', price:4999, sales:3456, img:'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=400&h=400&fit=crop' },
+  { name:'vivo X100 Pro 蔡司APO超级长焦', price:4299, sales:2901, img:'https://images.unsplash.com/photo-1546054454-aa26e2b734c7?w=400&h=400&fit=crop' },
+]
+
+const grid = document.getElementById('goodsGrid')
+goodsData.forEach(g => {
+  grid.innerHTML += `
+    <div class="goods-card">
+      <img class="goods-img" src="${g.img}" alt="${g.name}" loading="lazy" onerror="this.style.background='linear-gradient(135deg,#f0ece8,#e8e4e0)'">
+      <div class="goods-info">
+        <div class="goods-name">${g.name}</div>
+        <div class="goods-footer">
+          <span class="goods-price">&yen;${g.price.toLocaleString()}</span>
+          <span class="goods-sales">月销 ${g.sales}</span>
+        </div>
+      </div>
+    </div>`
+})
+
+// 切换逻辑
+function bindSwitch(selector, activeClass='active') {
+  document.querySelectorAll(selector).forEach(el => {
+    el.addEventListener('click', function() {
+      this.parentElement.querySelectorAll(selector).forEach(e => e.classList.remove(activeClass))
+      this.classList.add(activeClass)
+    })
+  })
+}
+bindSwitch('.sidebar-item')
+bindSwitch('.sub-tag')
+bindSwitch('.quick-cat-item')
+bindSwitch('.tabbar-item')
+</script>
+</body>
+</html>

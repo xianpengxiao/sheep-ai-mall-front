@@ -419,7 +419,7 @@ function buildQuickCats(tree) {
     { id: 'hot', name: '热销推荐', icon: '🔥', virtual: true },
     { id: 'newest', name: '最新上架', icon: '🆕', virtual: true },
   ]
-  const list = (tree || []).slice(0, 6).map(cat => ({
+  const list = (tree || []).slice(0, 12).map(cat => ({
     id: cat.id,
     name: cat.name,
     icon: matchIcon(cat.name),
@@ -488,9 +488,22 @@ onMounted(async () => {
   }
 })
 
-// keep-alive 重新激活时重置商家验证状态（等用户点击商家中心再检测）
-onActivated(() => {
+// keep-alive 重新激活时重置商家验证状态并刷新分类树
+onActivated(async () => {
   merchantVerified.value = null
+  try {
+    const tree = await getTree()
+    categoryTree.value = tree || []
+    quickCategories.value = buildQuickCats(categoryTree.value)
+    if (quickCategories.value.length > 0 && !quickCategories.value.find(c => String(c.id) === String(activeSubId.value))) {
+      // 如果当前选中的分类已不存在（如新增后顺序变化），重置到第一个
+      quickActive.value = 0
+      activeSubId.value = null
+    }
+    resetGoodsList()
+    loading.value = true
+    onLoad()
+  } catch { /* 静默处理 */ }
 })
 
 // 全局点击 → 关闭搜索下拉
@@ -1072,10 +1085,10 @@ async function onLoad() {
   box-shadow: 0 2px 8px rgba(232,87,58,0.3);
 }
 
-/* 商品网格 — 固定 6 列 260px，超出横向滚动 */
+/* 商品网格 — 自适应列数 */
 .goods-grid {
   display: grid;
-  grid-template-columns: repeat(6, 260px);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
 }
 
