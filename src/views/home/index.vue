@@ -1,5 +1,6 @@
 <template>
   <div class="page-home">
+    <div class="page-content">
     <!-- 1. 顶部导航 -->
     <div class="top-bar">
       <div class="brand">SheepAI Mall</div>
@@ -209,7 +210,8 @@
       </div>
     </div>
 
-  </div>
+    </div><!-- /page-content -->
+  </div><!-- /page-home -->
 </template>
 
 <script setup>
@@ -560,6 +562,10 @@ async function onLoad() {
 .page-home {
   background: #fff;
   min-height: 100vh;
+}
+.page-content {
+  max-width: 1800px;
+  margin: 0 auto;
 }
 
 /* ── 顶部导航 ── */
@@ -1085,11 +1091,12 @@ async function onLoad() {
   box-shadow: 0 2px 8px rgba(232,87,58,0.3);
 }
 
-/* 商品网格 — 自适应列数 */
+/* 商品网格 — 固定 6 列，自适应宽度 */
 .goods-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 20px;
+  max-width: 1500px;
 }
 
 /* ── PC 端适配 ── */
