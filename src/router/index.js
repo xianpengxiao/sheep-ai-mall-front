@@ -131,6 +131,13 @@ const routes = [
     component: () => import('../views/SecurityCenter.vue'),
     meta: { title: '安全中心', requiresAuth: true },
   },
+  // ── 智能客服 ──
+  {
+    path: '/chat',
+    name: 'Chat',
+    component: () => import('../views/chat/Index.vue'),
+    meta: { title: '智能客服' },
+  },
 ]
 
 const router = createRouter({
