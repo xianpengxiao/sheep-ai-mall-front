@@ -31,6 +31,14 @@
             <van-icon name="edit" size="18" />
             <span>编辑店铺</span>
           </div>
+          <div class="sh-edit" @click="$router.push('/merchant/ai')">
+            <van-icon name="service-o" size="18" />
+            <span>智能客服</span>
+          </div>
+          <div class="sh-edit" @click="$router.push('/merchant/cs')">
+            <van-icon name="chat-o" size="18" />
+            <span>客服坐席</span>
+          </div>
           <div class="sh-status-toggle">
             <van-switch v-model="shopInfo.shopStatus" :active-value="1" :inactive-value="0" size="18" @change="handleShopStatusChange" />
             <span class="sh-status-label">{{ shopInfo.shopStatus === 1 ? '营业中' : '休息中' }}</span>

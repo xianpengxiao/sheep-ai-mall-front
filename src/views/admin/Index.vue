@@ -21,6 +21,8 @@
       <ReviewTab v-if="activeTab === 'review'" />
       <FundTab v-if="activeTab === 'fund'" />
       <CategoryTab v-if="activeTab === 'category'" />
+      <KnowledgeTab v-if="activeTab === 'knowledge'" />
+      <CsTab v-if="activeTab === 'cs'" />
     </div>
   </div>
 </template>
@@ -34,6 +36,8 @@ import MerchantTab from './tabs/MerchantTab.vue'
 import ReviewTab from './tabs/ReviewTab.vue'
 import FundTab from './tabs/FundTab.vue'
 import CategoryTab from './tabs/CategoryTab.vue'
+import KnowledgeTab from './tabs/KnowledgeTab.vue'
+import CsTab from './tabs/CsTab.vue'
 
 const activeTab = ref('sys')
 
@@ -44,6 +48,8 @@ const tabs = [
   { key: 'review', label: '评价管理' },
   { key: 'fund', label: '资金管理' },
   { key: 'category', label: '分类管理' },
+  { key: 'knowledge', label: '知识库' },
+  { key: 'cs', label: '客服坐席' },
 ]
 </script>
 

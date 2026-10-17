@@ -27,6 +27,20 @@ export const useUserStore = defineStore('user', {
         return false
       })
     },
+    /** 是否平台管理员/运营（ROLE_ADMIN/ROLE_OPERATOR，与 home 顶栏判定一致） */
+    isAdmin: (state) => {
+      if (!state.memberInfo?.roles) return false
+      const roles = state.memberInfo.roles
+      if (!Array.isArray(roles)) return false
+      return roles.some(r => {
+        if (typeof r === 'string') return r === 'ROLE_ADMIN' || r === 'ROLE_OPERATOR'
+        if (typeof r === 'object' && r !== null) {
+          const code = r.code || r.name || ''
+          return code === 'ROLE_ADMIN' || code === 'ROLE_OPERATOR'
+        }
+        return false
+      })
+    },
   },
 
   actions: {

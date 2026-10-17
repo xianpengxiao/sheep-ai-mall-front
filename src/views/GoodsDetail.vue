@@ -598,8 +598,20 @@ function goToShop() {
   }
 }
 
+// ── 商家专属客服（与店铺页入口一致：?merchantId=xx&shopName=xx） ──
 function contactService() {
-  showToast('客服功能开发中')
+  const mid = merchantInfo.value?.id || spu.value?.merchantId
+  if (!mid) {
+    showToast('店铺信息获取中')
+    return
+  }
+  router.push({
+    path: '/chat',
+    query: {
+      merchantId: String(mid),
+      shopName: merchantInfo.value?.shopName || spu.value?.shopName || '',
+    },
+  })
 }
 
 // ── 用户评价（从 API 获取） ──

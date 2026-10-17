@@ -34,6 +34,13 @@
         <span class="sh-desc-text">{{ shopInfo.shopDesc }}</span>
       </div>
 
+      <!-- 联系客服入口：跳转商家专属智能客服 -->
+      <div class="sh-service-row">
+        <span class="sh-service-btn" @click="goCustomerService">
+          <van-icon name="service-o" size="14" /> 联系客服
+        </span>
+      </div>
+
       <!-- DSR 评分 -->
       <div class="sh-score">
         <span class="sh-star">★</span>
@@ -264,6 +271,18 @@ function filterReviews(val) {
   reviewsPage.value = 1
 }
 
+// ── 跳转商家专属智能客服（merId 即路由参数中的商家ID） ──
+function goCustomerService() {
+  if (!shopInfo.value) return
+  router.push({
+    path: '/chat',
+    query: {
+      merchantId: String(route.params.id),
+      shopName: shopInfo.value.shopName || '',
+    },
+  })
+}
+
 // 切换到评价 Tab 时加载数据
 watch(activeTab, (val) => {
   if (val === 'reviews' && !reviewsLoading.value) {
@@ -399,6 +418,30 @@ watch(() => route.params.id, (newId) => {
   font-size: 12px;
   line-height: 1.5;
   color: rgba(255,255,255,0.85);
+}
+
+/* ── 联系客服入口 ── */
+.sh-service-row {
+  padding: 0 18px 12px;
+}
+.sh-service-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.35);
+  padding: 5px 14px;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  user-select: none;
+}
+.sh-service-btn:active {
+  background: rgba(255,255,255,0.32);
+  transform: scale(0.96);
 }
 .sh-score {
   display: flex;

@@ -117,6 +117,18 @@ const routes = [
     component: () => import('../views/merchant/PublishGoods.vue'),
     meta: { title: '发布商品', requiresAuth: true },
   },
+  {
+    path: '/merchant/ai',
+    name: 'MerchantAiService',
+    component: () => import('../views/merchant/AiService.vue'),
+    meta: { title: '智能客服服务', requiresAuth: true },
+  },
+  {
+    path: '/merchant/cs',
+    name: 'MerchantCs',
+    component: () => import('../views/merchant/Cs.vue'),
+    meta: { title: '客服坐席', requiresAuth: true },
+  },
   // ── 管理后台 ──
   {
     path: '/admin',

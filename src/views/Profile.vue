@@ -80,6 +80,17 @@
 
     <!-- 功能菜单 -->
     <div class="menu-section">
+      <!-- 角色入口：商家账号可见商家中心，管理员可见管理中心 -->
+      <div v-if="userStore.isMerchant" class="menu-item" @click="$router.push('/merchant/dashboard')">
+        <van-icon name="shop-o" size="20" color="#e8573a" />
+        <span class="menu-text">商家中心</span>
+        <van-icon name="arrow" size="16" color="#c8c4c0" class="menu-arrow" />
+      </div>
+      <div v-if="userStore.isAdmin" class="menu-item" @click="$router.push('/admin')">
+        <van-icon name="setting-o" size="20" color="#e8573a" />
+        <span class="menu-text">管理中心</span>
+        <van-icon name="arrow" size="16" color="#c8c4c0" class="menu-arrow" />
+      </div>
       <div class="menu-item" @click="goSecurity">
         <van-icon name="eye-o" size="20" color="#e8573a" />
         <span class="menu-text">安全设置</span>

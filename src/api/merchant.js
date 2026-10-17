@@ -98,6 +98,21 @@ export function saveProductCopy(data) {
   return request.post('/ai/product-copy/save', data)
 }
 
+/** 查询商家智能客服服务开通状态 */
+export function getMerchantAiStatus() {
+  return request.get('/merchant/ai/status')
+}
+
+/** 开通/续费智能客服服务（假支付 ¥299/年） */
+export function subscribeMerchantAi() {
+  return request.post('/merchant/ai/subscribe')
+}
+
+/** AI自动接待开关（默认人工策略：1=开启AI接待 0=关闭按人工接待） */
+export function setMerchantAiEnabled(enabled) {
+  return request.put('/merchant/ai/ai-enabled', null, { params: { enabled } })
+}
+
 // ── 公开店铺页 ──
 
 /** 查询店铺商品列表（买家端公开） */

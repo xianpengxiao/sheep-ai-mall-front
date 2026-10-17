@@ -5,6 +5,8 @@
         <component :is="Component" />
       </keep-alive>
     </router-view>
+    <!-- 客服悬浮机器人入口（按路由白名单显隐） -->
+    <ChatFloatBtn />
   </div>
 </template>
 
@@ -12,6 +14,7 @@
   import { onMounted, onUnmounted } from 'vue'
   import { useUserStore } from './stores/user.js'
   import { getCurrentUser } from './api/member.js'
+  import ChatFloatBtn from './components/ChatFloatBtn.vue'
 
   const userStore = useUserStore()
 

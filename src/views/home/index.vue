@@ -43,7 +43,6 @@
             </div>
           </transition>
         </div>
-        <span class="pc-nav-item" @click="$router.push('/chat')">智能客服</span>
         <span v-if="hasAdminPerm" class="pc-nav-item" @click="$router.push('/admin')">管理中心</span>
         <!-- 登录 / 注册 或 用户信息 -->
         <template v-if="userStore.isLogin">
@@ -71,9 +70,6 @@
         <div class="icon-btn" @click="authGuardThen('/cart')">
           <van-icon name="shopping-cart-o" size="20" />
           <span class="badge" v-if="cartCount > 0">{{ cartCount > 99 ? '99+' : cartCount }}</span>
-        </div>
-        <div class="icon-btn" @click="$router.push('/chat')">
-          <van-icon name="service-o" size="20" />
         </div>
         <div class="icon-btn" @click="authGuardThen('/profile')">
           <van-icon name="user-o" size="20" />
