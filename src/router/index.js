@@ -129,6 +129,25 @@ const routes = [
     component: () => import('../views/merchant/Cs.vue'),
     meta: { title: '客服坐席', requiresAuth: true },
   },
+  {
+    path: '/merchant/after-sale',
+    name: 'MerchantAfterSale',
+    component: () => import('../views/merchant/AfterSale.vue'),
+    meta: { title: '售后管理', requiresAuth: true },
+  },
+  // ── 售后（用户端） ──
+  {
+    path: '/after-sale/apply',
+    name: 'AfterSaleApply',
+    component: () => import('../views/after-sale/Apply.vue'),
+    meta: { title: '申请售后', requiresAuth: true },
+  },
+  {
+    path: '/after-sale/my',
+    name: 'AfterSaleMy',
+    component: () => import('../views/after-sale/MyList.vue'),
+    meta: { title: '退款/售后', requiresAuth: true },
+  },
   // ── 管理后台 ──
   {
     path: '/admin',

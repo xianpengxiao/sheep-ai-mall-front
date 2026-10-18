@@ -26,6 +26,12 @@
     <template v-else>
       <!-- 消息列表 -->
       <div ref="msgListRef" class="msg-list" @scroll="onScroll">
+        <!-- 上拉加载更早 -->
+        <div v-if="timelineLoading && messages.length > 0" class="timeline-loading">
+          <van-loading size="16" color="#c8c4c0" /> <span>加载更早的消息...</span>
+        </div>
+        <div v-else-if="!timelineHasMore && messages.length > 0" class="timeline-top-hint">没有更早的消息了</div>
+
         <!-- 空状态 -->
         <div v-if="messages.length === 0 && !streaming" class="msg-empty">
           <van-icon name="service-o" size="48" color="#e0dcd8" />
@@ -75,8 +81,8 @@
                   </button>
                   <button class="op-btn op-btn-cancel" :disabled="op.loading" @click="handleConfirmOp(op, false)">取消</button>
                 </div>
-                <div v-else class="op-result" :class="op.state === 'done' ? 'is-done' : 'is-cancelled'">
-                  {{ op.state === 'done' ? '✓ 已执行' : '已取消' }}
+                <div v-else class="op-result" :class="op.state === 'done' ? 'is-done' : (op.state === 'expired' ? 'is-expired' : 'is-cancelled')">
+                  {{ op.state === 'done' ? '✓ 已执行' : op.state === 'expired' ? '已过期' : '已取消' }}
                 </div>
               </div>
             </div>
@@ -96,7 +102,10 @@
                   </div>
                   <div class="goods-card-actions">
                     <span class="goods-act detail" @click="goGoods(g.spuId)">查看详情</span>
-                    <span v-if="g.skuId" class="goods-act cart" :class="{ disabled: g._adding }" @click="addCartFromCard(msg, g)">
+                    <span class="goods-act buy" :class="{ disabled: g._acting }" @click="buyFromCard(msg, g)">
+                      {{ g._acting ? '处理中...' : '购买' }}
+                    </span>
+                    <span class="goods-act cart" :class="{ disabled: g._acting }" @click="addCartFromCard(msg, g)">
                       {{ g._adding ? '处理中...' : '加入购物车' }}
                     </span>
                   </div>
@@ -115,7 +124,10 @@
                   <span>金额 ¥{{ o.totalAmount }}</span>
                   <span>{{ formatTime(o.createTime) }}</span>
                 </div>
-                <div class="order-card-foot">查看详情 <van-icon name="arrow" size="12" /></div>
+                <div class="order-card-foot">
+                  <span>查看详情 <van-icon name="arrow" size="12" /></span>
+                  <span v-if="canAfterSale(o)" class="order-card-act" @click.stop="openAfterSalePicker(msg, o)">申请售后</span>
+                </div>
               </div>
             </div>
           </div>
@@ -151,12 +163,6 @@
 
       <!-- 底部输入栏 -->
       <div class="input-bar">
-        <!-- 会话选择按钮 -->
-        <div class="input-sessions-btn" @click="showSessions = true">
-          <van-icon name="chat-o" size="20" color="#5a5a6e" />
-          <van-badge v-if="sessions.length > 0" :content="sessions.length" max="9" class="session-badge" />
-        </div>
-
         <div class="input-field-wrap">
           <input
             v-model="inputText"
@@ -178,46 +184,82 @@
       </div>
     </template>
 
-    <!-- ═══ 会话列表侧边抽屉 ═══ -->
-    <van-popup v-model:show="showSessions" position="left" :style="{ width: '80%', height: '100%' }" round safe-area-inset-bottom>
-      <div class="sessions-panel">
-        <div class="sessions-header">
-          <span class="sessions-title">对话历史</span>
-          <span v-if="!merchantId" class="sessions-new-btn" @click="handleNewChat">
-            <van-icon name="add-o" size="16" /> 新建
-          </span>
-        </div>
-
-        <div v-if="sessionsLoading" class="sessions-loading">
-          <van-loading size="24" color="#e8573a" />
-        </div>
-
-        <div v-else-if="sessions.length === 0" class="sessions-empty">
-          <van-icon name="chat-o" size="36" color="#e0dcd8" />
-          <span>暂无对话记录</span>
-        </div>
-
-        <div v-else class="sessions-list">
+    <!-- ═══ 商品卡片加购：规格/数量选择弹层 ═══ -->
+    <van-popup v-model:show="skuPicker.show" position="bottom" round safe-area-inset-bottom>
+      <div class="sku-picker">
+        <div class="sku-picker-title">选择规格</div>
+        <div class="sku-picker-list">
           <div
-            v-for="s in sessions"
-            :key="s.id"
-            class="session-item"
-            :class="{ active: currentSessionId === s.id }"
-            @click="handleSelectSession(s)"
+            v-for="s in skuPicker.skus"
+            :key="s.skuId"
+            class="sku-option"
+            :class="{ active: String(skuPicker.selected) === String(s.skuId) }"
+            @click="skuPicker.selected = s.skuId"
           >
-            <div class="session-item-main">
-              <div class="session-item-title">{{ s.shopName || s.title }}</div>
-              <div class="session-item-preview">{{ s.lastMessage }}</div>
-              <div class="session-item-meta">
-                <span>{{ s.messageCount }} 条消息</span>
-                <span>{{ formatTime(s.lastMessageAt) }}</span>
-              </div>
+            <div class="sku-option-main">
+              <span class="sku-option-name">{{ s.skuName || '默认规格' }}</span>
+              <span class="sku-option-price">¥{{ s.price ?? '?' }}</span>
             </div>
-            <div class="session-item-del" @click.stop="handleDeleteSession(s)">
-              <van-icon name="delete-o" size="16" color="#c8c4c0" />
+            <span class="sku-option-stock">库存 {{ s.stock ?? '-' }}</span>
+          </div>
+        </div>
+        <div class="sku-picker-qty">
+          <span class="sku-picker-qty-label">数量</span>
+          <van-stepper v-model="skuPicker.quantity" min="1" :max="Math.max(1, Math.min((skuPicker.skus.find(x => String(x.skuId) === String(skuPicker.selected)) || {}).stock ?? 99, 99))" integer />
+        </div>
+        <button class="sku-picker-confirm" @click="confirmSkuPicker">{{ skuPicker.mode === 'buy' ? '下一步：选地址' : '加入购物车' }}</button>
+      </div>
+    </van-popup>
+
+    <!-- ═══ 商品卡片购买：收货地址选择弹层 ═══ -->
+    <van-popup v-model:show="addressPicker.show" position="bottom" round safe-area-inset-bottom>
+      <div class="sku-picker">
+        <div class="sku-picker-title">选择收货地址</div>
+        <div class="sku-picker-list">
+          <div
+            v-for="a in addressPicker.list"
+            :key="a.id"
+            class="sku-option"
+            :class="{ active: String(addressPicker.selected) === String(a.id) }"
+            @click="addressPicker.selected = a.id"
+          >
+            <div class="sku-option-main">
+              <span class="sku-option-name">{{ a.receiverName }} {{ a.receiverPhone }}</span>
+            </div>
+            <span class="sku-option-stock">{{ a.province }}{{ a.city }}{{ a.district }} {{ a.detailAddress }}</span>
+          </div>
+        </div>
+        <button class="sku-picker-confirm" @click="confirmAddressPicker">生成订单（确认后待支付）</button>
+      </div>
+    </van-popup>
+
+    <!-- ═══ 订单卡片申请售后：类型（按订单状态收敛）+ 原因弹层 ═══ -->
+    <van-popup v-model:show="afterSalePicker.show" position="bottom" round safe-area-inset-bottom>
+      <div class="sku-picker">
+        <div class="sku-picker-title">申请售后 · 订单 {{ afterSalePicker.order?.orderNo }}</div>
+        <div class="sku-picker-list">
+          <div
+            v-for="opt in afterSaleTypeOptions"
+            :key="opt.value"
+            class="sku-option"
+            :class="{ active: afterSalePicker.type === opt.value }"
+            @click="afterSalePicker.type = opt.value"
+          >
+            <div class="sku-option-main">
+              <span class="sku-option-name">{{ opt.label }}</span>
+              <span class="sku-option-stock">{{ opt.desc }}</span>
             </div>
           </div>
         </div>
+        <van-field
+          v-model="afterSalePicker.reason"
+          type="textarea"
+          rows="2"
+          maxlength="200"
+          placeholder="请描述售后原因，如商品质量问题、七天无理由等"
+          class="as-reason-field"
+        />
+        <button class="sku-picker-confirm" @click="confirmAfterSalePicker">提交售后申请</button>
       </div>
     </van-popup>
   </div>
@@ -228,7 +270,8 @@ import { ref, computed, watch, nextTick, onActivated, onDeactivated, onMounted, 
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import NavBar from '../../components/NavBar.vue'
-import { getSessions, getMessages, deleteSession, sendMessageStream, confirmOperation, transferToHuman, createAddCartOp } from '../../api/chat.js'
+import { getMessages, sendMessageStream, confirmOperation, transferToHuman, createAddCartOp, createOrderOp, createAfterSaleOp, getPendingOpStates, getGoodsSkus, getTimeline, getSessions } from '../../api/chat.js'
+import { getAddressList } from '../../api/address.js'
 import { useUserStore } from '../../stores/user.js'
 
 const userStore = useUserStore()
@@ -256,17 +299,17 @@ function syncShopQuery() {
 
 // ── 页面状态 ──
 const pageLoading = ref(false)
-const showSessions = ref(false)
 const inputText = ref('')
 const streaming = ref(false)
 const msgListRef = ref(null)
 const scrollAnchorRef = ref(null)
 
-// ── 会话 ──
-const sessions = ref([])
-const sessionsLoading = ref(false)
+// ── 聊天对象（单时间线：平台或某商家的全部消息一条连续时间线） ──
 const currentSessionId = ref(null)
+const sessionServiceMode = ref(null)
 const messages = ref([])
+const timelineHasMore = ref(false)
+const timelineLoading = ref(false)
 
 // ── 快捷问题 ──
 const quickQuestions = ['如何退货？', '发货时效是多久？', '如何联系客服？', '如何修改收货地址？']
@@ -275,10 +318,9 @@ const quickQuestions = ['如何退货？', '发货时效是多久？', '如何�
 // 仅由"用户主动转人工成功"或"当前会话服务模式为人工"驱动；
 // 不能用历史消息推断——人工消息会永久留在记录里，坐席转回 AI 后会导致人工态无法退出
 const manualHuman = ref(false)
-const currentSession = computed(() => sessions.value.find(s => String(s.id) === String(currentSessionId.value)))
 const humanMode = computed(() =>
   manualHuman.value
-  || (currentSession.value && currentSession.value.serviceMode === 1)
+  || (currentSessionId.value && sessionServiceMode.value === 1)
 )
 
 // ── 人工态轮询 ──
@@ -304,10 +346,11 @@ async function pollHumanMessages() {
     mergeMessages(data || [])
   } catch { /* 静默轮询失败 */ }
   // 同步会话服务模式：坐席转回 AI / 超时自动转回后，退出人工态并停止轮询
+  // （会话列表接口仅用于轻量同步 serviceMode；单时间线下不再展示会话列表）
   try {
-    const data = await getSessions(sessionListParams({ silent: true }))
-    applySessions(data)
-    const cur = sessions.value.find(s => String(s.id) === String(currentSessionId.value))
+    const data = await getSessions({ silent: true, params: merchantId.value ? { merchantId: merchantId.value } : {} })
+    const cur = (data || []).find(s => String(s.id) === String(currentSessionId.value))
+    if (cur) sessionServiceMode.value = cur.serviceMode
     if (cur && cur.serviceMode !== 1) manualHuman.value = false
   } catch { /* 静默轮询失败 */ }
 }
@@ -321,6 +364,8 @@ function mergeMessages(fetched) {
     const msg = { id: raw.id ?? null, role: raw.role, content: raw.content || '' }
     // 轮询拉到的 AI 消息同样解析剔除 PENDING_OP 标记
     if (msg.role === 1) extractPendingOps(msg)
+    // toolCalls 结构化数据（卡片/操作单随消息持久化）优先恢复
+    applyToolCalls(msg, raw.toolCalls)
     if (msg.id != null && existIds.has(String(msg.id))) continue
     const local = msg.id != null && messages.value.find(l => l.id == null && l.role === msg.role && l.content === msg.content)
     if (local) { local.id = msg.id; continue }
@@ -333,6 +378,8 @@ function mergeMessages(fetched) {
     scrollToBottom()
     // 新消息标题提示：离开客服页期间收到坐席回复 → 标签页标题闪烁
     if (hasAgentReply && !chatActive) startTitleFlash()
+    // 新拉到带操作单的历史消息时回查状态，恢复确认卡
+    restorePendingOpStates()
   }
 }
 
@@ -380,9 +427,10 @@ let lastUserId = null
 
 function resetChat() {
   currentSessionId.value = null
+  sessionServiceMode.value = null
   messages.value = []
+  timelineHasMore.value = false
   inputText.value = ''
-  sessions.value = []
   manualHuman.value = false
   stopHumanPoll()
   // 停止正在进行的流式请求
@@ -425,73 +473,61 @@ onActivated(() => {
     resetChat()
   }
   lastUserId = currentUserId
-  fetchSessions()
+  loadTimeline()
 })
 
-// ── 获取会话列表 ──
-/** 列表请求参数：商家入口只拉该商家会话，平台入口只拉平台会话（后端按聊天对象隔离） */
-function sessionListParams(extra = {}) {
-  return { ...extra, params: merchantId.value ? { merchantId: merchantId.value } : {} }
+// 聊天对象切换（平台/商家入口 query 变化，keep-alive 下实例复用）：重载时间线
+watch(() => route.query.merchantId, () => {
+  if (lastUserId === null) return
+  resetChat()
+  syncShopQuery()
+  loadTimeline()
+})
+
+// ── 单时间线加载（首屏/上拉分页；beforeId 游标） ──
+/** 消息统一恢复：解析操作单标记 + toolCalls 结构化数据（卡片/操作单） */
+function toViewMessage(raw) {
+  const msg = { id: raw.id ?? null, role: raw.role, content: raw.content || '' }
+  if (msg.role === 1) extractPendingOps(msg)
+  applyToolCalls(msg, raw.toolCalls)
+  return msg
 }
 
-/**
- * 应用会话列表（设计 D4 按对象聚合 + 商家入口自动续接）：
- * 商家入口下当前选中会话不在列表（归属切换/被删除）时，自动切到该商家最近会话；
- * 一条会话都没有则清空进入待创建态
- */
-function applySessions(data) {
-  sessions.value = data || []
-  if (!merchantId.value) return
-  const cur = sessions.value.find(s => String(s.id) === String(currentSessionId.value))
-  if (cur) return
-  if (sessions.value.length > 0) {
-    handleSelectSession(sessions.value[0])
-  } else if (currentSessionId.value) {
-    currentSessionId.value = null
-    messages.value = []
-    manualHuman.value = false
-  }
-}
-
-async function fetchSessions() {
-  sessionsLoading.value = true
+async function loadTimeline(beforeId = null) {
+  if (timelineLoading.value) return
+  timelineLoading.value = true
+  if (!beforeId) pageLoading.value = true
   try {
-    const data = await getSessions(sessionListParams())
-    applySessions(data)
-  } catch { sessions.value = [] }
-  finally { sessionsLoading.value = false }
-}
-
-// ── 选择会话，加载消息历史 ──
-async function handleSelectSession(session) {
-  currentSessionId.value = session.id
-  showSessions.value = false
-  pageLoading.value = true
-  messages.value = []
-  manualHuman.value = false
-  try {
-    const data = await getMessages(session.id)
-    messages.value = (data || []).map(m => {
-      const msg = { id: m.id ?? null, role: m.role, content: m.content || '' }
-      // 历史消息也可能带 PENDING_OP 标记，统一解析剔除
-      if (msg.role === 1) extractPendingOps(msg)
-      return msg
+    const data = await getTimeline({
+      merchantId: merchantId.value || undefined,
+      beforeId: beforeId || undefined,
+      size: 20,
     })
-    await scrollToBottom(false)
+    const list = (data?.messages || []).map(toViewMessage)
+    if (!beforeId) {
+      // 首屏/切换对象：整体替换
+      messages.value = list
+      currentSessionId.value = data?.currentSessionId ?? null
+      sessionServiceMode.value = data?.currentSessionServiceMode ?? null
+      await restorePendingOpStates()
+      await scrollToBottom(false)
+    } else {
+      // 上拉：前插更早一页（保持滚动位置）
+      const el = msgListRef.value
+      const prevHeight = el ? el.scrollHeight : 0
+      const existIds = new Set(messages.value.filter(m => m.id != null).map(m => String(m.id)))
+      const older = list.filter(m => m.id == null || !existIds.has(String(m.id)))
+      messages.value = [...older, ...messages.value]
+      await nextTick()
+      if (el) el.scrollTop = el.scrollHeight - prevHeight
+    }
+    timelineHasMore.value = !!data?.hasMore
   } catch {
-    showToast('加载消息失败')
+    if (!beforeId) showToast('加载消息失败')
   } finally {
+    timelineLoading.value = false
     pageLoading.value = false
   }
-}
-
-// ── 新建会话 ──
-function handleNewChat() {
-  currentSessionId.value = null
-  messages.value = []
-  showSessions.value = false
-  inputText.value = ''
-  manualHuman.value = false
 }
 
 // ── 转人工 ──
@@ -506,7 +542,6 @@ async function handleTransfer() {
     // 本地追加转接提示（/transfer 接口不改消息历史，提示仅前端展示）
     messages.value.push({ role: 1, content: '已为您转接人工客服，人工客服将尽快接入，请稍候。' })
     await scrollToBottom()
-    fetchSessions() // 刷新会话列表，同步 serviceMode
     refreshHumanPoll() // 立即启动人工态轮询
   } catch { /* 错误已由拦截器 toast */ }
 }
@@ -603,7 +638,7 @@ async function handleSend() {
     // 从响应头读取 sessionId（后端每次请求都返回）
     const sid = response.headers.get('X-Session-Id')
     // 商家回落识别：实际会话归属与入口商家不一致 = 商家未开通/已过期，后端已回落平台会话。
-    // 此时若停留在商家视图，会话不在商家列表内会被 applySessions 清空，需主动切到平台视图
+    // 单时间线下需主动切到平台视图，否则会话落在平台对象、当前视图永远拉不到消息
     const respMerchant = response.headers.get('X-Session-Merchant')
     if (merchantId.value && respMerchant !== String(merchantId.value)) {
       fallbackMerchant = merchantId.value
@@ -631,8 +666,7 @@ async function handleSend() {
       messages.value.splice(aiMsgIdx, 1)
     }
 
-    // 流结束后刷新会话列表
-    fetchSessions()
+    // 新会话首帧建立了会话：更新 currentSessionId（SSE 头已在上文处理）
   } catch (e) {
     if (e?.name === 'AbortError') return
     console.error('[Chat] SSE error:', e)
@@ -712,6 +746,51 @@ function parseCardMarker(content, re) {
   return { text: content.replace(re, '').trimEnd(), list: list.slice(0, 2) }
 }
 
+// ── toolCalls 结构化恢复：卡片/操作单随消息持久化（chat_message.tool_calls），刷新后恢复 ──
+function applyToolCalls(msg, rawToolCalls) {
+  if (!rawToolCalls || msg.role !== 1) return
+  let tc = null
+  try { tc = typeof rawToolCalls === 'string' ? JSON.parse(rawToolCalls) : rawToolCalls } catch { return }
+  if (!tc || typeof tc !== 'object') return
+  if (Array.isArray(tc.goodsCards) && tc.goodsCards.length) msg.goodsCards = tc.goodsCards.slice(0, 2)
+  if (Array.isArray(tc.orderCards) && tc.orderCards.length) msg.orderCards = tc.orderCards.slice(0, 2)
+  if (Array.isArray(tc.pendingOps) && tc.pendingOps.length) {
+    msg.pendingOps = tc.pendingOps.map(op => ({
+      operationId: op.operationId,
+      displayText: op.displayText || '',
+      opType: op.opType || '',
+      state: '', // 状态由 restorePendingOpStates 回查后回填
+      loading: false,
+    }))
+  }
+}
+
+const OP_STATE_MAP = { DONE: 'done', CANCELLED: 'cancelled', EXPIRED: 'expired' }
+
+/** 回查所有待确认操作单的最新状态并回填（刷新/轮询后恢复确认卡状态；失败静默，确认时服务端有最终校验） */
+async function restorePendingOpStates() {
+  const ids = []
+  for (const msg of messages.value) {
+    if (msg.pendingOps) {
+      for (const op of msg.pendingOps) {
+        if (op.operationId && !op.state) ids.push(op.operationId)
+      }
+    }
+  }
+  if (!ids.length) return
+  try {
+    const states = await getPendingOpStates([...new Set(ids)])
+    for (const msg of messages.value) {
+      if (!msg.pendingOps) continue
+      for (const op of msg.pendingOps) {
+        if (!op.state && states && states[op.operationId]) {
+          op.state = OP_STATE_MAP[states[op.operationId]] || ''
+        }
+      }
+    }
+  } catch { /* 静默 */ }
+}
+
 /** 商品卡片跳转详情页 */
 function goGoods(spuId) {
   if (spuId) router.push(`/goods/${spuId}`)
@@ -722,14 +801,172 @@ function goOrder(orderId) {
   if (orderId) router.push(`/order/detail/${orderId}`)
 }
 
-/** 商品卡片"加入购物车"：生成待确认操作单，复用确认卡片 UI（走确认闸，确认后才真正加购） */
+// ── 商品卡片"加入购物车"：规格/数量选择 ──
+// 单在售规格直接生成操作单；多在售规格弹规格选择层（规格名/价格/库存，缺货禁选）+ 数量步进器。
+const skuPicker = ref({ show: false, skus: [], selected: null, quantity: 1, mode: 'cart', target: null })
+
 async function addCartFromCard(msg, g) {
-  if (g._adding || !g.skuId) return
+  if (g._acting) return
+  g._acting = true
+  g._adding = true
+  try {
+    const list = await getGoodsSkus(g.spuId)
+    const skus = (list || []).filter(s => s.stock == null || s.stock > 0)
+    if (!skus.length) { showToast('该商品暂无在售规格'); return }
+    if (skus.length === 1) {
+      await createCartOpFromCard(msg, g, skus[0], 1)
+      return
+    }
+    skuPicker.value = { show: true, skus, selected: skus[0].skuId, quantity: 1, mode: 'cart', target: { msg, g } }
+  } catch { /* 业务失败由 request.js 统一 toast */ }
+  finally { g._acting = false; g._adding = false }
+}
+
+// ── 商品卡片"购买"：规格/数量 → 收货地址 → 生成 CREATE_ORDER 待确认操作单 ──
+const addressPicker = ref({ show: false, list: [], selected: null, pending: null })
+
+async function buyFromCard(msg, g) {
+  if (g._acting) return
+  g._acting = true
+  try {
+    const list = await getGoodsSkus(g.spuId)
+    const skus = (list || []).filter(s => s.stock == null || s.stock > 0)
+    if (!skus.length) { showToast('该商品暂无在售规格'); return }
+    if (skus.length === 1) {
+      await openAddressPicker({ msg, g, sku: skus[0], qty: 1 })
+      return
+    }
+    skuPicker.value = { show: true, skus, selected: skus[0].skuId, quantity: 1, mode: 'buy', target: { msg, g } }
+  } catch { /* 业务失败由 request.js 统一 toast */ }
+  finally { g._acting = false }
+}
+
+/** 规格选择弹层确认：加购直接建单；购买继续选收货地址 */
+async function confirmSkuPicker() {
+  const picker = skuPicker.value
+  const sku = picker.skus.find(s => String(s.skuId) === String(picker.selected))
+  if (!sku) return
+  const maxQty = Math.max(1, Math.min(sku.stock ?? 99, 99))
+  const qty = Math.min(Math.max(1, picker.quantity || 1), maxQty)
+  picker.show = false
+  if (picker.mode === 'buy') {
+    await openAddressPicker({ msg: picker.target.msg, g: picker.target.g, sku, qty })
+  } else {
+    await createCartOpFromCard(picker.target.msg, picker.target.g, sku, qty)
+  }
+}
+
+/** 打开收货地址选择层（默认选中默认地址） */
+async function openAddressPicker(pending) {
+  let addresses = []
+  try {
+    addresses = await getAddressList() || []
+  } catch { /* 统一 toast */ }
+  if (!addresses.length) {
+    showToast('请先添加收货地址')
+    router.push('/address/edit')
+    return
+  }
+  const def = addresses.find(a => a.isDefault === 1) || addresses[0]
+  addressPicker.value = { show: true, list: addresses, selected: def.id, pending }
+}
+
+/** 地址确认：生成 CREATE_ORDER 待确认操作单并挂到所属消息 */
+async function confirmAddressPicker() {
+  const picker = addressPicker.value
+  const { msg, g, sku, qty } = picker.pending || {}
+  if (!sku) return
+  picker.show = false
+  g._acting = true
+  try {
+    const marker = await createOrderOp({
+      spuId: g.spuId,
+      skuId: sku.skuId,
+      quantity: qty,
+      addressId: picker.selected,
+      sessionId: currentSessionId.value,
+    })
+    if (!msg.pendingOps) msg.pendingOps = []
+    msg.pendingOps.push({
+      operationId: marker.operationId,
+      displayText: marker.displayText || `创建待支付订单：${g.name}`,
+      opType: marker.opType || 'CREATE_ORDER',
+      state: '',
+      loading: false,
+    })
+    await scrollToBottom()
+  } catch { /* 业务失败由 request.js 统一 toast */ }
+  finally { g._acting = false }
+}
+
+// ── 订单卡片"申请售后"：弹层选类型（按订单状态收敛）+ 原因 → AFTER_SALE 待确认操作单 ──
+const AS_TYPE_OPTIONS = {
+  REFUND_ONLY: { value: 'REFUND_ONLY', label: '仅退款', desc: '未发货，直接退款' },
+  RETURN_REFUND: { value: 'RETURN_REFUND', label: '退货退款', desc: '退回商品，商家确认后退款' },
+  EXCHANGE: { value: 'EXCHANGE', label: '换货', desc: '商家寄出新商品' },
+}
+const afterSalePicker = ref({ show: false, order: null, msg: null, type: '', reason: '' })
+
+/** 仅待发货/待收货/已完成订单可申请售后；本卡片已提交过（内存标记 + localStorage 持久化）则不再显示 */
+function canAfterSale(o) {
+  if (!o || o._afterSaleSubmitted) return false
+  if (Number(o.status) !== 1 && Number(o.status) !== 2 && Number(o.status) !== 3) return false
+  try {
+    if (localStorage.getItem('cs:as:submitted:' + o.orderId)) return false
+  } catch { /* localStorage 不可用时仅靠内存标记 */ }
+  return true
+}
+
+const afterSaleTypeOptions = computed(() => {
+  const status = Number(afterSalePicker.value.order?.status)
+  if (status === 1) return [AS_TYPE_OPTIONS.REFUND_ONLY]
+  if (status === 2 || status === 3) return [AS_TYPE_OPTIONS.RETURN_REFUND, AS_TYPE_OPTIONS.EXCHANGE]
+  return []
+})
+
+function openAfterSalePicker(msg, order) {
+  const opts = Number(order.status) === 1
+    ? [AS_TYPE_OPTIONS.REFUND_ONLY]
+    : [AS_TYPE_OPTIONS.RETURN_REFUND, AS_TYPE_OPTIONS.EXCHANGE]
+  afterSalePicker.value = { show: true, order, msg, type: opts[0]?.value || '', reason: '' }
+}
+
+/** 提交售后操作单：生成 AFTER_SALE 待确认操作单并挂到所属消息 */
+async function confirmAfterSalePicker() {
+  const picker = afterSalePicker.value
+  if (!picker.order || !picker.type) return
+  if (!picker.reason?.trim()) { showToast('请填写申请原因'); return }
+  picker.show = false
+  const msg = picker.msg
+  try {
+    const marker = await createAfterSaleOp({
+      orderId: picker.order.orderId,
+      type: picker.type,
+      reason: picker.reason.trim(),
+      sessionId: currentSessionId.value,
+    })
+    if (!msg.pendingOps) msg.pendingOps = []
+    msg.pendingOps.push({
+      operationId: marker.operationId,
+      displayText: marker.displayText || '申请售后',
+      opType: marker.opType || 'AFTER_SALE',
+      state: '',
+      loading: false,
+    })
+    showToast('已生成售后申请，请在下方确认卡中确认')
+    picker.order._afterSaleSubmitted = true
+    try { localStorage.setItem('cs:as:submitted:' + picker.order.orderId, '1') } catch { /* 忽略 */ }
+    await scrollToBottom()
+  } catch { /* 业务失败由 request.js 统一 toast（如状态不允许/已有售后单） */ }
+}
+
+/** 创建加购待确认操作单并挂到所属消息（复用确认卡 UI，走确认闸） */
+async function createCartOpFromCard(msg, g, sku, quantity) {
   g._adding = true
   try {
     const marker = await createAddCartOp({
-      skuId: g.skuId,
-      quantity: 1,
+      skuId: sku.skuId,
+      quantity,
       sessionId: currentSessionId.value,
     })
     if (!msg.pendingOps) msg.pendingOps = []
@@ -751,6 +988,8 @@ function opTypeText(opType) {
     UPDATE_ADDRESS: '修改地址',
     CANCEL_ORDER: '取消订单',
     ADD_CART: '加入购物车',
+    CREATE_ORDER: '创建订单',
+    AFTER_SALE: '申请售后',
   }
   return map[opType] || opType || '其他操作'
 }
@@ -767,34 +1006,24 @@ async function handleConfirmOp(op, approve) {
   finally { op.loading = false }
 }
 
-// ── 删除会话 ──
-async function handleDeleteSession(session) {
-  try {
-    await showConfirmDialog({
-      title: '提示',
-      message: `确认删除「${session.title}」吗？`,
-      confirmButtonColor: '#e8573a',
-    })
-    await deleteSession(session.id)
-    showToast('已删除')
-    if (currentSessionId.value === session.id) {
-      handleNewChat()
-    }
-    await fetchSessions()
-  } catch (e) {
-    if (e?.toString().includes('cancel')) return
-    showToast('删除失败')
-  }
-}
-
 // ── 滚动到底部 ──
 async function scrollToBottom(smooth = true) {
   await nextTick()
   scrollAnchorRef.value?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant', block: 'end' })
 }
 
-// ── 用户手动滚动时暂停自动滚动（简化：不中断用户操作） ──
-function onScroll() { /* 保留用于未来扩展 */ }
+// ── 上拉分页：滚动到顶部附近时加载更早消息 ──
+let scrollThrottleTimer = null
+function onScroll() {
+  const el = msgListRef.value
+  if (!el || timelineLoading.value) return
+  if (el.scrollTop > 60) return
+  if (!timelineHasMore.value || messages.value.length === 0) return
+  if (scrollThrottleTimer) return
+  scrollThrottleTimer = setTimeout(() => { scrollThrottleTimer = null }, 400)
+  const oldest = messages.value.find(m => m.id != null)
+  if (oldest) loadTimeline(oldest.id)
+}
 
 // ── 时间格式化 ──
 function formatTime(isoStr) {
@@ -859,6 +1088,21 @@ function formatTime(isoStr) {
 }
 
 /* 空状态 */
+.timeline-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0 2px;
+  font-size: 12px;
+  color: #9a9aae;
+}
+.timeline-top-hint {
+  text-align: center;
+  padding: 10px 0 2px;
+  font-size: 11px;
+  color: #c8c4c0;
+}
 .msg-empty {
   display: flex;
   flex-direction: column;
@@ -1042,6 +1286,8 @@ function formatTime(isoStr) {
   user-select: none;
 }
 .goods-act.detail { border: 1px solid #d0ccc8; color: #5a5a6e; }
+.goods-act.buy { border: 1px solid #e8573a; color: #e8573a; }
+.goods-act.buy.disabled { opacity: 0.6; }
 .goods-act.cart { background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%); color: #fff; }
 .goods-act.cart.disabled { opacity: 0.6; }
 
@@ -1150,6 +1396,9 @@ function formatTime(isoStr) {
 }
 .op-result.is-cancelled {
   color: #9a9aae;
+}
+.op-result.is-expired {
+  color: #c8a04a;
 }
 
 /* 流式光标 */
@@ -1411,6 +1660,99 @@ function formatTime(isoStr) {
 }
 .session-item-del:active :deep(.van-icon) {
   color: #e8573a !important;
+}
+
+/* ══════════════════════════════════════════════
+   规格/数量选择弹层（商品卡片加购）
+   ══════════════════════════════════════════════ */
+.sku-picker {
+  padding: 18px 16px calc(14px + env(safe-area-inset-bottom));
+}
+.sku-picker-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #3a3a4a;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.sku-picker-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+.sku-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 12px;
+  border: 1px solid #e8e4e0;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.sku-option.active {
+  border-color: #e8573a;
+  background: #fdf1ee;
+}
+.sku-option-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sku-option-name {
+  font-size: 14px;
+  color: #3a3a4a;
+}
+.sku-option-price {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e8573a;
+}
+.sku-option-stock {
+  font-size: 12px;
+  color: #9a9aae;
+}
+.sku-picker-qty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px 14px;
+}
+.sku-picker-qty-label {
+  font-size: 14px;
+  color: #3a3a4a;
+}
+.sku-picker-confirm {
+  width: 100%;
+  border: none;
+  border-radius: 22px;
+  padding: 12px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #f06a4a, #e8573a);
+  cursor: pointer;
+}
+.sku-picker-confirm:active {
+  opacity: 0.85;
+}
+.as-reason-field {
+  margin-bottom: 12px;
+  border: 1px solid #e8e4e0;
+  border-radius: 10px;
+}
+.order-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.order-card-act {
+  color: #e8573a;
+  font-weight: 600;
+  padding: 2px 10px;
+  border: 1px solid #e8573a;
+  border-radius: 12px;
+  font-size: 12px;
 }
 
 /* ══════════════════════════════════════════════

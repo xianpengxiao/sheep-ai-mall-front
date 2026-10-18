@@ -13,6 +13,9 @@
         <van-tab title="待收货" name="2" />
         <van-tab title="已完成" name="3" />
       </van-tabs>
+      <div class="aftersale-entry" @click="$router.push('/after-sale/my')">
+        <van-icon name="after-sale" size="14" /> 退款/售后
+      </div>
     </div>
 
     <!-- ═══════ 加载中 ═══════ -->
@@ -37,6 +40,9 @@
             </div>
             <div class="header-status" :class="'s-' + order.status">{{ statusLabel(order.status) }}</div>
           </div>
+          <!-- 退款/售后状态标识 -->
+          <div v-if="order.refundStatus === 2" class="order-refund-tag">已退款</div>
+          <div v-else-if="order.afterSaleStatus === 'PENDING'" class="order-aftersale-tag">售后中</div>
 
           <!-- ── 商品列表 ── -->
           <div class="order-items">
@@ -76,11 +82,18 @@
             </template>
             <template v-else-if="order.status === 1">
               <van-button round size="small" plain class="action-btn" @click="goDetail(order.id)">查看详情</van-button>
+              <van-button v-if="order.afterSaleStatus !== 'PENDING'" round size="small" plain class="action-btn" @click="goAfterSale(order)">申请售后</van-button>
+              <van-button v-else round size="small" plain disabled class="action-btn action-btn-disabled">售后中</van-button>
             </template>
             <template v-else-if="order.status === 2">
+              <van-button round size="small" plain class="action-btn" @click="goDetail(order.id)">查看详情</van-button>
+              <van-button v-if="order.afterSaleStatus !== 'PENDING'" round size="small" plain class="action-btn" @click="goAfterSale(order)">申请售后</van-button>
+              <van-button v-else round size="small" plain disabled class="action-btn action-btn-disabled">售后中</van-button>
               <van-button round size="small" plain class="action-btn" @click="handleComplete(order)">确认收货</van-button>
             </template>
             <template v-else-if="order.status === 3">
+              <van-button v-if="order.afterSaleStatus !== 'PENDING'" round size="small" plain class="action-btn" @click="goAfterSale(order)">申请售后</van-button>
+              <van-button v-else round size="small" plain disabled class="action-btn action-btn-disabled">售后中</van-button>
               <template v-if="orderReviewState(order) === 1">
                 <van-button round size="small" plain class="action-btn" @click="viewReview(order)">查看我的评论</van-button>
               </template>
@@ -470,6 +483,10 @@ function goDetail(id) {
   router.push(`/order/detail/${id}`)
 }
 
+function goAfterSale(order) {
+  router.push({ path: '/after-sale/apply', query: { orderId: order.id } })
+}
+
 function goGoods(spuId) {
   if (spuId) router.push(`/goods/${spuId}`)
 }
@@ -674,6 +691,35 @@ onActivated(() => {
   top: 46px;
   z-index: 50;
   background: #fff;
+}
+.aftersale-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 0;
+  font-size: 12px;
+  color: #8a8a9a;
+  border-top: 1px solid #f5f3f0;
+  cursor: pointer;
+}
+.order-refund-tag {
+  margin: 8px 16px 0;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #07c160;
+  background: #e8f9ef;
+  border-radius: 4px;
+  display: inline-block;
+}
+.order-aftersale-tag {
+  margin: 8px 16px 0;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: #c8a04a;
+  background: #fdf6e3;
+  border-radius: 4px;
+  display: inline-block;
 }
 
 /* ── 状态容器 ── */

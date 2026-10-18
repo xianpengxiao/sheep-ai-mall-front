@@ -10,6 +10,15 @@ export function getMessages(sessionId, config) {
   return request.get(`/ai/chat/sessions/${sessionId}/messages`, config)
 }
 
+/** 聊天对象聚合时间线（单时间线展示）：beforeId=早于该消息 id（不传=最新一页） */
+export function getTimeline({ merchantId, beforeId, size }, config) {
+  const params = {}
+  if (merchantId) params.merchantId = merchantId
+  if (beforeId) params.beforeId = beforeId
+  if (size) params.size = size
+  return request.get('/ai/chat/messages/timeline', { ...config, params })
+}
+
 /** 转人工客服 */
 export function transferToHuman(sessionId) {
   return request.post('/ai/chat/transfer', { sessionId })
@@ -53,4 +62,27 @@ export function confirmOperation(operationId, approve) {
 /** 商品卡片"加入购物车"：仅生成待确认操作单（走确认闸），返回 {operationId, displayText, opType} */
 export function createAddCartOp({ skuId, quantity, sessionId }) {
   return request.post('/ai/chat/add-cart-op', { skuId, quantity, sessionId })
+}
+
+/**
+ * 批量查询操作单最新状态（刷新历史确认卡时回显）
+ * 返回 { operationId: 'PENDING'|'DONE'|'CANCELLED'|'EXPIRED' }
+ */
+export function getPendingOpStates(ids) {
+  return request.get('/ai/chat/pending-ops/states', { params: { ids: ids.join(',') } })
+}
+
+/** 商品卡片规格列表（SKU ID 已字符串化）：加购选规格用，返回 [{skuId, skuName, price, stock}] */
+export function getGoodsSkus(spuId) {
+  return request.get(`/ai/chat/goods/${spuId}/skus`)
+}
+
+/** 商品卡片"购买"：仅生成待确认操作单（CREATE_ORDER，确认后创建待支付订单，不代支付） */
+export function createOrderOp({ spuId, skuId, quantity, addressId, sessionId }) {
+  return request.post('/ai/chat/create-order-op', { spuId, skuId, quantity, addressId, sessionId })
+}
+
+/** 订单卡片"申请售后"：仅生成待确认操作单（AFTER_SALE，确认后创建待处理售后单） */
+export function createAfterSaleOp({ orderId, type, reason, sessionId }) {
+  return request.post('/ai/chat/after-sale-op', { orderId, type, reason, sessionId })
 }
