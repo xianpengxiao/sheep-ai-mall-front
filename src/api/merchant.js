@@ -113,6 +113,11 @@ export function setMerchantAiEnabled(enabled) {
   return request.put('/merchant/ai/ai-enabled', null, { params: { enabled } })
 }
 
+/** 领取智能客服免费试用（30天，20w Token/月，每商家限一次） */
+export function claimMerchantAiTrial() {
+  return request.post('/merchant/ai/trial')
+}
+
 // ── 公开店铺页 ──
 
 /** 查询店铺商品列表（买家端公开） */
@@ -123,11 +128,6 @@ export function getMerchantGoods(merId, params) {
 /** 查询店铺评价列表（买家端公开，可按 rating 过滤） */
 export function getMerchantReviews(merId, params) {
   return request.get(`/merchant/${merId}/reviews`, { params })
-}
-
-/** 查询指定店铺的经营分类列表（买家端公开） */
-export function getMerchantCategories(merId) {
-  return request.get(`/merchant/${merId}/categories`)
 }
 
 /** 查询当前商家的经营分类列表（商家后台） */

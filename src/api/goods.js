@@ -16,25 +16,6 @@ export function getSpuDetail(id) {
   return request.get(`/spu/${id}`)
 }
 
-/**
- * 根据 SPU ID 查询 SKU 列表
- * @param {number} spuId
- * @returns {Promise<Array>} SKU 列表，每个 SKU 包含 price 字段
- */
-export function getSkuBySpuId(spuId) {
-  return request.get(`/sku/spu/${spuId}`)
-}
-
-/** 新增 SPU（含 SKU 列表） */
-export function addSpu(data) {
-  return request.post('/spu', data)
-}
-
-/** 编辑 SPU */
-export function updateSpu(id, data) {
-  return request.put(`/spu/${id}`, data)
-}
-
 /** 删除 SPU */
 export function deleteSpu(id) {
   return request.delete(`/spu/${id}`)

@@ -42,10 +42,10 @@
           </div>
         </div>
 
-        <!-- 消息气泡 -->
+        <!-- 消息气泡（微信样式：按需插入时间分隔条） -->
+        <template v-for="(msg, idx) in messages" :key="msg.id ?? idx">
+          <div v-if="showTimeDivider(idx)" class="time-divider">{{ formatDividerTime(msg.createTime) }}</div>
         <div
-          v-for="(msg, idx) in messages"
-          :key="idx"
           class="msg-bubble-wrap"
           :class="{ 'is-user': msg.role === 0, 'is-ai': msg.role !== 0 }"
         >
@@ -61,7 +61,7 @@
           <div class="msg-body">
             <!-- 人工消息来源小标签 -->
             <div v-if="msg.role === 2 || msg.role === 3" class="sender-label">{{ msg.role === 2 ? '店铺客服' : '官方客服' }}</div>
-            <div class="msg-bubble" :class="{ 'bubble-user': msg.role === 0, 'bubble-ai': msg.role === 1, 'bubble-human': msg.role === 2 || msg.role === 3 }">
+            <div class="msg-bubble" v-if="!msg.hideText" :class="{ 'bubble-user': msg.role === 0, 'bubble-ai': msg.role === 1, 'bubble-human': msg.role === 2 || msg.role === 3 }">
               <div class="bubble-text">{{ msg.content }}</div>
               <!-- 流式输出时的光标动画 -->
               <span v-if="streaming && idx === messages.length - 1 && msg.role === 1" class="typing-cursor">|</span>
@@ -120,6 +120,18 @@
                   <span class="order-card-no">{{ o.orderNo }}</span>
                   <span class="order-card-status">{{ o.statusText }}</span>
                 </div>
+                <!-- 商品明细行（最多 2 条 + 等N件），点击直达商品详情 -->
+                <div v-if="o.items && o.items.length" class="order-card-items">
+                  <div v-for="(it, ii) in o.items" :key="'i' + ii" class="order-item-row" @click.stop="goGoods(it.spuId)">
+                    <img v-if="it.image" :src="it.image" class="order-item-img" alt="" />
+                    <div v-else class="order-item-img-ph"><van-icon name="photo-o" size="14" color="#c8c4c0" /></div>
+                    <div class="order-item-info">
+                      <div class="order-item-name">{{ it.name }}</div>
+                      <div class="order-item-spec">{{ it.skuName || '' }} x{{ it.quantity }}</div>
+                    </div>
+                  </div>
+                  <div v-if="o.itemCount > o.items.length" class="order-item-more">等 {{ o.itemCount }} 件商品</div>
+                </div>
                 <div class="order-card-row sub">
                   <span>金额 ¥{{ o.totalAmount }}</span>
                   <span>{{ formatTime(o.createTime) }}</span>
@@ -137,6 +149,7 @@
             <van-icon name="user-o" size="18" color="#fff" />
           </div>
         </div>
+        </template>
 
         <!-- 流式输出中的占位（首次还没有 AI 消息时） -->
         <div v-if="streaming && messages.length === 0" class="msg-bubble-wrap is-ai">
@@ -159,6 +172,24 @@
         <span class="tool-chip" @click="handleTransfer">
           <van-icon name="service-o" size="13" /> 转人工
         </span>
+      </div>
+
+      <!-- 咨询商品悬浮条（淘宝同款：进入展示不发送，滚动让位，点发送才成消息） -->
+      <div v-if="consultGoods && !consultHidden" class="consult-goods-bar">
+        <img v-if="consultGoods.image" :src="consultGoods.image" class="consult-goods-img" alt="" />
+        <div v-else class="consult-goods-img consult-goods-img-ph"><van-icon name="photo-o" size="16" color="#c8c4c0" /></div>
+        <div class="consult-goods-info" @click="goGoods(consultGoods.spuId)">
+          <div class="consult-goods-name">{{ consultGoods.name }}</div>
+          <div v-if="consultGoods.price" class="consult-goods-price">¥{{ consultGoods.price }}</div>
+        </div>
+        <span class="consult-goods-send" @click="sendConsultGoods">发送</span>
+        <van-icon name="cross" size="14" color="#9a9aae" class="consult-goods-close" @click="closeConsultGoods" />
+      </div>
+
+      <!-- 工具执行状态条（查询中提示，仅流式期间展示，不入消息内容） -->
+      <div v-if="streaming && toolStatus" class="tool-status-bar">
+        <van-loading size="13" color="#e8573a" />
+        <span>{{ toolStatus }}</span>
       </div>
 
       <!-- 底部输入栏 -->
@@ -270,8 +301,9 @@ import { ref, computed, watch, nextTick, onActivated, onDeactivated, onMounted, 
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import NavBar from '../../components/NavBar.vue'
-import { getMessages, sendMessageStream, confirmOperation, transferToHuman, createAddCartOp, createOrderOp, createAfterSaleOp, getPendingOpStates, getGoodsSkus, getTimeline, getSessions } from '../../api/chat.js'
+import { getMessages, sendMessageStream, confirmOperation, transferToHuman, createAddCartOp, createOrderOp, createAfterSaleOp, getPendingOpStates, getGoodsSkus, getTimeline, getSessions, reportViewing } from '../../api/chat.js'
 import { getAddressList } from '../../api/address.js'
+import { getSpuDetail } from '../../api/goods.js'
 import { useUserStore } from '../../stores/user.js'
 
 const userStore = useUserStore()
@@ -280,20 +312,12 @@ const router = useRouter()
 
 // ── 商家客服入口（从店铺页跳转携带 ?merchantId=xx&shopName=xx） ──
 // 商家入口语义：会话列表只含该商家会话（后端按对象隔离），单会话模型自动续接，不提供"新建"
-// fallbackMerchant：该商家未开通/已过期被后端回落平台会话后，本次停留期间不再切回商家入口
-let fallbackMerchant = null
+// 未开通/已过期的商家由后端直接按商家人工接待（会话归属不回落平台），前端无需回落处理
 const merchantId = ref(null)
 const shopName = ref('')
 
 function syncShopQuery() {
-  const q = route.query.merchantId || null
-  if (q && String(q) === String(fallbackMerchant)) {
-    merchantId.value = null
-    shopName.value = ''
-    return
-  }
-  if (q !== merchantId.value) fallbackMerchant = null
-  merchantId.value = q
+  merchantId.value = route.query.merchantId || null
   shopName.value = route.query.shopName || ''
 }
 
@@ -301,6 +325,8 @@ function syncShopQuery() {
 const pageLoading = ref(false)
 const inputText = ref('')
 const streaming = ref(false)
+// 工具执行状态（SSE TOOL_STATUS 帧驱动，仅流式期间展示，不入消息）
+const toolStatus = ref('')
 const msgListRef = ref(null)
 const scrollAnchorRef = ref(null)
 
@@ -361,7 +387,7 @@ function mergeMessages(fetched) {
   let appended = false
   let hasAgentReply = false
   for (const raw of fetched) {
-    const msg = { id: raw.id ?? null, role: raw.role, content: raw.content || '' }
+    const msg = { id: raw.id ?? null, role: raw.role, content: raw.content || '', createTime: raw.createTime || null }
     // 轮询拉到的 AI 消息同样解析剔除 PENDING_OP 标记
     if (msg.role === 1) extractPendingOps(msg)
     // toolCalls 结构化数据（卡片/操作单随消息持久化）优先恢复
@@ -432,12 +458,18 @@ function resetChat() {
   timelineHasMore.value = false
   inputText.value = ''
   manualHuman.value = false
+  consultLoadedSpuId = null
+  consultGoods.value = null
+  consultClosed = false
+  consultHidden.value = false
+  clearViewingReport()  // 切换聊天对象：清除旧对象的浏览状态
   stopHumanPoll()
   // 停止正在进行的流式请求
   if (abortController) {
     abortController.abort()
     abortController = null
     streaming.value = false
+    toolStatus.value = ''
   }
 }
 
@@ -461,7 +493,10 @@ onUnmounted(() => {
 })
 
 // 离开客服页面（keep-alive 路由切换）：标记页面失活，期间收到的坐席回复触发标题闪烁
-onDeactivated(() => { chatActive = false })
+onDeactivated(() => {
+  chatActive = false
+  clearViewingReport()  // 离开页面：清除"正在浏览"状态
+})
 
 onActivated(() => {
   chatActive = true
@@ -473,7 +508,7 @@ onActivated(() => {
     resetChat()
   }
   lastUserId = currentUserId
-  loadTimeline()
+  loadTimeline().then(loadConsultGoods)
 })
 
 // 聊天对象切换（平台/商家入口 query 变化，keep-alive 下实例复用）：重载时间线
@@ -481,13 +516,69 @@ watch(() => route.query.merchantId, () => {
   if (lastUserId === null) return
   resetChat()
   syncShopQuery()
-  loadTimeline()
+  loadTimeline().then(loadConsultGoods)
 })
 
+// ── 咨询商品悬浮条（淘宝同款：进入展示不发送；点「发送」才成为消息；滚动让位；打字时隐式带给 AI） ──
+// consultGoods: 当前悬浮商品；consultHidden: 滚动让位/关闭隐藏；consultClosed: 用户主动关闭（本次进入不再现）
+const consultGoods = ref(null)
+const consultHidden = ref(false)
+let consultClosed = false
+let consultLoadedSpuId = null
+
+/** 加载悬浮商品条（仅商家入口且未发送过同商品卡片时） */
+async function loadConsultGoods() {
+  const spuId = route.query.spuId ? String(route.query.spuId) : null
+  if (!spuId || !merchantId.value || consultLoadedSpuId === spuId) return
+  consultLoadedSpuId = spuId
+  // 时间线已有同商品咨询卡片（之前已点过发送）→ 不再展示商品条
+  const exists = messages.value.some(m =>
+    m.role === 0 && (m.goodsCards || []).some(g => String(g.spuId) === spuId))
+  if (exists) return
+  try {
+    const spu = await getSpuDetail(spuId)
+    if (spu && spu.id) {
+      consultGoods.value = {
+        spuId: String(spu.id),
+        name: spu.name || route.query.spuName || '该商品',
+        // 商品详情接口价格字段为 price（minPrice 是列表口径，兜底兼容）
+        price: spu.price ?? spu.minPrice ?? null,
+        image: spu.mainImage || '',
+      }
+      consultHidden.value = false
+      consultClosed = false
+      // 上报"正在浏览"：商家坐席工作台横幅展示（失败静默）
+      reportViewing(merchantId.value, spuId)
+    }
+  } catch { /* 商品加载失败则不展示商品条 */ }
+}
+
+/** 清除浏览状态上报（关闭/发送/离开/切换对象时调用；无浏览状态时为无害空操作） */
+function clearViewingReport() {
+  if (merchantId.value) reportViewing(merchantId.value, null)
+}
+
+/** 点「发送」：商品卡片作为用户消息发出（走正常对话管线，AI 据此应答，坐席可见） */
+function sendConsultGoods() {
+  if (!consultGoods.value || streaming.value) return
+  const g = consultGoods.value
+  consultGoods.value = null
+  clearViewingReport()
+  handleSend(`我正在咨询商品：${g.name}`, g.spuId,
+    { spuId: g.spuId, name: g.name, price: g.price, image: g.image })
+}
+
+/** 关闭商品条（本次进入不再展示） */
+function closeConsultGoods() {
+  consultGoods.value = null
+  consultClosed = true
+  clearViewingReport()
+}
+
 // ── 单时间线加载（首屏/上拉分页；beforeId 游标） ──
-/** 消息统一恢复：解析操作单标记 + toolCalls 结构化数据（卡片/操作单） */
+/** 消息统一恢复：解析操作单标记 + toolCalls 结构化数据（卡片/操作单）；createTime 用于微信样式时间分隔条 */
 function toViewMessage(raw) {
-  const msg = { id: raw.id ?? null, role: raw.role, content: raw.content || '' }
+  const msg = { id: raw.id ?? null, role: raw.role, content: raw.content || '', createTime: raw.createTime || null }
   if (msg.role === 1) extractPendingOps(msg)
   applyToolCalls(msg, raw.toolCalls)
   return msg
@@ -510,7 +601,13 @@ async function loadTimeline(beforeId = null) {
       currentSessionId.value = data?.currentSessionId ?? null
       sessionServiceMode.value = data?.currentSessionServiceMode ?? null
       await restorePendingOpStates()
+      // 先结束加载态让消息区渲染（v-else 分支挂载 scroll anchor），再滚到底部；
+      // 原实现滚动时 pageLoading 仍为 true，锚点不在 DOM 中导致滚动无效、停留在顶部
+      pageLoading.value = false
+      await nextTick()
       await scrollToBottom(false)
+      // 卡片/图片渲染可能引起二次布局，再兜底滚一次
+      setTimeout(() => scrollToBottom(false), 150)
     } else {
       // 上拉：前插更早一页（保持滚动位置）
       const el = msgListRef.value
@@ -540,19 +637,25 @@ async function handleTransfer() {
     await transferToHuman(currentSessionId.value)
     manualHuman.value = true
     // 本地追加转接提示（/transfer 接口不改消息历史，提示仅前端展示）
-    messages.value.push({ role: 1, content: '已为您转接人工客服，人工客服将尽快接入，请稍候。' })
+    messages.value.push({ role: 1, content: '已为您转接人工客服，人工客服将尽快接入，请稍候。', createTime: new Date().toISOString() })
     await scrollToBottom()
     refreshHumanPoll() // 立即启动人工态轮询
   } catch { /* 错误已由拦截器 toast */ }
 }
 
 // ── 发送消息 ──
-async function handleSend() {
-  const text = inputText.value.trim()
+// overrideText/contextSpuId：商品条「发送」用（卡片消息）；consultCard：本地即时渲染的卡片数据
+async function handleSend(overrideText = null, contextSpuId = null, consultCard = null) {
+  // 模板事件直绑（@click/@keydown.enter）会把事件对象传进来，仅接受字符串覆盖
+  const text = (typeof overrideText === 'string' && overrideText.trim()) ? overrideText.trim() : inputText.value.trim()
   if (!text || streaming.value) return
 
-  // 添加用户消息到列表
-  messages.value.push({ role: 0, content: text })
+  // 添加用户消息到列表（咨询卡片消息：本地即挂卡片 + 隐藏文字气泡，与服务端 hideText 持久化口径一致）
+  messages.value.push({
+    role: 0, content: text, createTime: new Date().toISOString(),
+    hideText: !!consultCard,
+    goodsCards: consultCard ? [consultCard] : undefined,
+  })
   inputText.value = ''
   await scrollToBottom()
 
@@ -562,13 +665,15 @@ async function handleSend() {
 
   // 先添加一个空的 AI 消息占位
   const aiMsgIdx = messages.value.length
-  messages.value.push({ role: 1, content: '' })
+  messages.value.push({ role: 1, content: '', createTime: new Date().toISOString() })
   await scrollToBottom()
 
   try {
     // 已有会话时沿用会话归属，merchantId 不生效
     const merId = currentSessionId.value ? null : merchantId.value
-    const response = await sendMessageStream(currentSessionId.value, text, merId)
+    // 商品条展示中的手动输入（非点「发送」）：隐式携带当前商品给 AI，不落卡片
+    const implicitSpuId = (!contextSpuId && consultGoods.value) ? consultGoods.value.spuId : null
+    const response = await sendMessageStream(currentSessionId.value, text, merId, contextSpuId, implicitSpuId)
 
     if (!response.ok) {
       const errText = await response.text()
@@ -606,6 +711,12 @@ async function handleSend() {
           }
           if (!line || line === '[DONE]') continue
 
+          // 工具状态帧（[[TOOL_STATUS:…]]）：只更新打字区状态文本，不进入消息内容/历史
+          if (line.startsWith('[[TOOL_STATUS:') && line.endsWith(']]')) {
+            toolStatus.value = line.slice('[[TOOL_STATUS:'.length, -2)
+            continue
+          }
+
           // 尝试解析 Claude JSON 事件，提取 delta.text
           try {
             const json = JSON.parse(line)
@@ -628,6 +739,8 @@ async function handleSend() {
           }
 
           if (line) {
+            // 首个真实文本帧到达：清除工具状态提示
+            toolStatus.value = ''
             messages.value[aiMsgIdx].content += line
             await scrollToBottom()
           }
@@ -637,15 +750,6 @@ async function handleSend() {
 
     // 从响应头读取 sessionId（后端每次请求都返回）
     const sid = response.headers.get('X-Session-Id')
-    // 商家回落识别：实际会话归属与入口商家不一致 = 商家未开通/已过期，后端已回落平台会话。
-    // 单时间线下需主动切到平台视图，否则会话落在平台对象、当前视图永远拉不到消息
-    const respMerchant = response.headers.get('X-Session-Merchant')
-    if (merchantId.value && respMerchant !== String(merchantId.value)) {
-      fallbackMerchant = merchantId.value
-      merchantId.value = null
-      shopName.value = ''
-      showToast('该商家未开通智能客服，已为您接入平台客服')
-    }
     if (sid) {
       currentSessionId.value = sid
     }
@@ -678,6 +782,7 @@ async function handleSend() {
     if (!msg.includes('abort')) showToast(msg)
   } finally {
     streaming.value = false
+    toolStatus.value = ''
     abortController = null
   }
 }
@@ -748,12 +853,16 @@ function parseCardMarker(content, re) {
 
 // ── toolCalls 结构化恢复：卡片/操作单随消息持久化（chat_message.tool_calls），刷新后恢复 ──
 function applyToolCalls(msg, rawToolCalls) {
-  if (!rawToolCalls || msg.role !== 1) return
+  if (!rawToolCalls) return
   let tc = null
   try { tc = typeof rawToolCalls === 'string' ? JSON.parse(rawToolCalls) : rawToolCalls } catch { return }
   if (!tc || typeof tc !== 'object') return
+  // 商品/订单卡片所有角色通用（用户消息也可挂咨询商品卡片）；待确认操作单仅 AI 消息
   if (Array.isArray(tc.goodsCards) && tc.goodsCards.length) msg.goodsCards = tc.goodsCards.slice(0, 2)
   if (Array.isArray(tc.orderCards) && tc.orderCards.length) msg.orderCards = tc.orderCards.slice(0, 2)
+  // 咨询商品消息：只展示卡片，隐藏文字气泡（文本仅作 LLM 上下文与坐席端阅读）
+  if (tc.hideText) msg.hideText = true
+  if (msg.role !== 1) return
   if (Array.isArray(tc.pendingOps) && tc.pendingOps.length) {
     msg.pendingOps = tc.pendingOps.map(op => ({
       operationId: op.operationId,
@@ -911,6 +1020,9 @@ const afterSalePicker = ref({ show: false, order: null, msg: null, type: '', rea
 function canAfterSale(o) {
   if (!o || o._afterSaleSubmitted) return false
   if (Number(o.status) !== 1 && Number(o.status) !== 2 && Number(o.status) !== 3) return false
+  // 已退款 / 售后中的订单禁止重复申请（服务端 validate 为准，前端仅隐藏入口）
+  if (Number(o.refundStatus) === 2) return false
+  if (o.afterSalePending) return false
   try {
     if (localStorage.getItem('cs:as:submitted:' + o.orderId)) return false
   } catch { /* localStorage 不可用时仅靠内存标记 */ }
@@ -1016,7 +1128,13 @@ async function scrollToBottom(smooth = true) {
 let scrollThrottleTimer = null
 function onScroll() {
   const el = msgListRef.value
-  if (!el || timelineLoading.value) return
+  if (!el) return
+  // 商品悬浮条滚动让位：离开底部（翻历史）隐藏，回到底部重现（未关闭时）
+  if (consultGoods.value && !consultClosed) {
+    const distToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    consultHidden.value = distToBottom > 80
+  }
+  if (timelineLoading.value) return
   if (el.scrollTop > 60) return
   if (!timelineHasMore.value || messages.value.length === 0) return
   if (scrollThrottleTimer) return
@@ -1035,6 +1153,35 @@ function formatTime(isoStr) {
   if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
   return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+// ── 微信样式时间分隔条：首条必显；与上一条间隔超 3 分钟才显示新时间条 ──
+const TIME_DIVIDER_GAP = 3 * 60 * 1000
+
+function showTimeDivider(idx) {
+  const cur = messages.value[idx]
+  if (!cur || !cur.createTime) return false
+  if (idx === 0) return true
+  const prev = messages.value[idx - 1]
+  if (!prev || !prev.createTime) return true
+  return new Date(cur.createTime) - new Date(prev.createTime) > TIME_DIVIDER_GAP
+}
+
+function pad2(n) { return String(n).padStart(2, '0') }
+
+/** 分隔条格式：今天 HH:mm；昨天 昨天 HH:mm；当年 MM-dd HH:mm；跨年 yyyy-MM-dd HH:mm */
+function formatDividerTime(isoStr) {
+  const d = new Date(isoStr)
+  if (isNaN(d)) return ''
+  const now = new Date()
+  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfMsgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dayDiff = Math.round((startOfToday - startOfMsgDay) / 86400000)
+  if (dayDiff === 0) return hm
+  if (dayDiff === 1) return `昨天 ${hm}`
+  if (d.getFullYear() === now.getFullYear()) return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${hm}`
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${hm}`
 }
 </script>
 
@@ -1077,6 +1224,75 @@ function formatTime(isoStr) {
 /* ══════════════════════════════════════════════
    消息列表
    ══════════════════════════════════════════════ */
+/* 工具执行状态条：流式期间显示在输入栏上方 */
+.tool-status-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #999;
+  background: #faf8f5;
+  border-top: 1px solid #f0ece8;
+}
+
+/* 咨询商品悬浮条（淘宝同款） */
+.consult-goods-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #f0ece8;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.consult-goods-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+
+.consult-goods-img-ph {
+  background: #f5f3f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.consult-goods-info { flex: 1; min-width: 0; }
+
+.consult-goods-name {
+  font-size: 13px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.consult-goods-price { font-size: 13px; color: #e8573a; font-weight: 600; margin-top: 2px; }
+
+.consult-goods-send {
+  flex-shrink: 0;
+  padding: 5px 14px;
+  border-radius: 14px;
+  background: #e8573a;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.consult-goods-close { flex-shrink: 0; padding: 4px; cursor: pointer; }
+
+/* 微信样式时间分隔条：居中灰字 */
+.time-divider {
+  text-align: center;
+  font-size: 12px;
+  color: #b5b1ac;
+  margin: 10px 0 6px;
+  user-select: none;
+}
+
 .msg-list {
   flex: 1;
   overflow-y: auto;
@@ -1306,6 +1522,24 @@ function formatTime(isoStr) {
 .order-card-no { font-size: 13px; font-weight: 600; color: #1a1a2e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .order-card-status { font-size: 12px; color: #f39c12; font-weight: 600; flex-shrink: 0; }
 .order-card-row.sub { margin-top: 4px; font-size: 12px; color: #5a5a6e; }
+/* 订单卡片商品明细行 */
+.order-card-items { margin-top: 6px; border-top: 1px solid #f2f0ec; padding-top: 6px; }
+.order-item-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.order-item-img { width: 34px; height: 34px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+.order-item-img-ph {
+  width: 34px; height: 34px; border-radius: 4px; background: #f5f3f0;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.order-item-info { flex: 1; min-width: 0; }
+.order-item-name {
+  font-size: 12px; color: #333; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.order-item-spec {
+  font-size: 11px; color: #999; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.order-item-more { font-size: 11px; color: #9a9aae; padding: 2px 0 0 42px; }
 .order-card-foot {
   margin-top: 6px;
   font-size: 11px;

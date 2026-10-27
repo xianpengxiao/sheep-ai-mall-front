@@ -5,16 +5,6 @@ export function getTree() {
   return request.get('/category/tree')
 }
 
-/** 根据 ID 获取分类详情 */
-export function getCategoryById(id) {
-  return request.get('/category/' + id)
-}
-
-/** 查子分类列表（平面） */
-export function getCategoryChildren(parentId) {
-  return request.get('/category/children/' + parentId)
-}
-
 /** 新增分类 */
 export function createCategory(data) {
   return request.post('/category', data)

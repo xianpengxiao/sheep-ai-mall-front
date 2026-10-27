@@ -68,6 +68,26 @@
     </div>
     <van-loading v-else-if="shopLoading" class="loading-center" size="24" />
 
+    <!-- 智能客服试用卡片（常驻，非弹窗：未开通且未领取过才显示；×关闭存本机） -->
+    <div v-if="showAiTrialCard" class="ai-trial-card">
+      <van-icon name="service-o" size="20" color="#e8573a" />
+      <div class="ai-trial-card-body">
+        <div class="ai-trial-card-title">
+          {{ aiTrialCanClaim ? '免费体验智能客服 30 天' : '智能客服试用已到期' }}
+        </div>
+        <div class="ai-trial-card-desc">
+          {{ aiTrialCanClaim ? 'AI 自动接待 + 店铺专属知识库，试用含 20w Token/月额度' : '开通正式版即可恢复 AI 接待与知识库能力' }}
+        </div>
+        <div class="ai-trial-card-actions">
+          <span v-if="aiTrialCanClaim" class="ai-trial-btn primary" @click="handleTrialClaim">
+            {{ aiTrialClaiming ? '领取中...' : '立即体验' }}
+          </span>
+          <span class="ai-trial-btn" @click="goAiService">去开通 ¥299/年</span>
+        </div>
+      </div>
+      <van-icon name="cross" size="14" color="#9a9aae" class="ai-trial-close" @click="closeAiTrialCard" />
+    </div>
+
     <!-- 店铺公告（独立模块） -->
     <div class="sh-notice" v-if="shopInfo?.shopNotice">
       <div class="sh-notice-inner">
@@ -535,7 +555,7 @@ import { showToast, showConfirmDialog, showDialog } from 'vant'
 import { useRouter } from 'vue-router'
 import NavBar from '../../components/NavBar.vue'
 import GoodsForm from '../../components/goods/GoodsForm.vue'
-import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage, getDsrTrend, updateShopStatus, publishGoods, toggleMerchantGoodsStatus } from '../../api/merchant.js'
+import { getShopInfo, updateShopInfo, getShopOrders, getShopStats, getShopReviews, updateMerchantGoods, getMerchantGoodsPage, getDsrTrend, updateShopStatus, publishGoods, toggleMerchantGoodsStatus, getMerchantAiStatus, claimMerchantAiTrial } from '../../api/merchant.js'
 import AccountFund from './fund/Account.vue'
 import WithdrawFund from './fund/Withdraw.vue'
 import FlowFund from './fund/Flow.vue'
@@ -599,7 +619,45 @@ const scopeDisplayText = computed(() => {
 /** 弹窗内平铺的全部分类选项 */
 const flatScopeOptions = ref([])
 
+// ── 智能客服试用卡片（常驻，非弹窗：未开通且未领取过才显示；×关闭存本机 localStorage） ──
+const showAiTrialCard = ref(false)
+const aiTrialCanClaim = ref(true)
+const aiTrialClaiming = ref(false)
+
+const AI_TRIAL_CARD_KEY = 'ai_trial_card_closed'
+
+async function checkAiTrialCard() {
+  try {
+    if (localStorage.getItem(AI_TRIAL_CARD_KEY)) return
+    const st = await getMerchantAiStatus()
+    if (!st || st.subscribed) return
+    aiTrialCanClaim.value = !!st.canTrial
+    showAiTrialCard.value = true
+  } catch { /* 状态拉取失败不显示卡片 */ }
+}
+
+function closeAiTrialCard() {
+  showAiTrialCard.value = false
+  try { localStorage.setItem(AI_TRIAL_CARD_KEY, '1') } catch { /* 隐私模式等场景忽略 */ }
+}
+
+async function handleTrialClaim() {
+  aiTrialClaiming.value = true
+  try {
+    await claimMerchantAiTrial()
+    showToast('试用领取成功，有效期 30 天')
+    showAiTrialCard.value = false
+    router.push('/merchant/ai')
+  } catch { /* 失败由 request.js 统一 toast */ }
+  finally { aiTrialClaiming.value = false }
+}
+
+function goAiService() {
+  router.push('/merchant/ai')
+}
+
 onMounted(async () => {
+  checkAiTrialCard()  // 智能客服试用卡片（异步，不阻塞主流程）
   // 加载全部分类树 → 展平为选项（供弹窗数据源 + 名称查找）
   try {
     const tree = await getTree()
@@ -1229,6 +1287,31 @@ onActivated(() => {
 </script>
 
 <style scoped>
+/* ── 智能客服试用卡片（常驻非弹窗） ── */
+.ai-trial-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 14px 0;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #fff7f2 0%, #fff 100%);
+  border: 1px solid #ffe0d1;
+  border-radius: 12px;
+}
+.ai-trial-card-body { flex: 1; min-width: 0; }
+.ai-trial-card-title { font-size: 14px; font-weight: 700; color: #1a1a2e; }
+.ai-trial-card-desc { font-size: 12px; color: #9a9aae; margin-top: 3px; line-height: 1.5; }
+.ai-trial-card-actions { display: flex; gap: 10px; margin-top: 10px; }
+.ai-trial-btn {
+  padding: 5px 14px; border-radius: 14px; font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid #e8573a; color: #e8573a; background: #fff;
+}
+.ai-trial-btn.primary {
+  background: linear-gradient(135deg, #e8573a 0%, #f39c12 100%);
+  border: none; color: #fff;
+}
+.ai-trial-close { flex-shrink: 0; padding: 2px; cursor: pointer; }
+
 .page-merchant {
   min-height: 100vh;
   background: #f5f3f0;

@@ -24,11 +24,6 @@ export function transferToHuman(sessionId) {
   return request.post('/ai/chat/transfer', { sessionId })
 }
 
-/** 删除会话 */
-export function deleteSession(sessionId) {
-  return request.delete(`/ai/chat/sessions/${sessionId}`)
-}
-
 /**
  * 发送消息（SSE 流式）
  * 返回 fetch Response 对象，调用方自行读取 ReadableStream
@@ -39,19 +34,28 @@ export function deleteSession(sessionId) {
  * @param content   消息内容
  * @param merchantId 商家ID（仅新建会话时生效，进入商家专属客服）
  */
-export function sendMessageStream(sessionId, content, merchantId) {
+export function sendMessageStream(sessionId, content, merchantId, contextSpuId = null, implicitSpuId = null) {
   const token = localStorage.getItem('token')
   const headers = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const body = { sessionId: sessionId || null, content }
   if (merchantId) body.merchantId = merchantId
+  // 咨询商品上下文：字符串传参规避 19 位雪花 ID 的 JSON 精度丢失
+  if (contextSpuId) body.contextSpuId = String(contextSpuId)
+  // 隐式浏览商品：商品条展示期间的手动提问携带，仅注入当轮 AI 上下文
+  if (implicitSpuId) body.implicitSpuId = String(implicitSpuId)
 
   return fetch(`${import.meta.env.VITE_API_BASE || '/api'}/ai/chat/send`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   })
+}
+
+/** 上报/清除当前浏览商品（spuId 空=清除；商家坐席"正在浏览"横幅数据源；失败静默） */
+export function reportViewing(merchantId, spuId) {
+  return request.post('/ai/chat/viewing', { merchantId, spuId: spuId || null }).catch(() => {})
 }
 
 /** 确认/取消 AI 待执行操作（改地址/取消订单/加购物车） */

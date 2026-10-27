@@ -610,6 +610,9 @@ function contactService() {
     query: {
       merchantId: String(mid),
       shopName: merchantInfo.value?.shopName || spu.value?.shopName || '',
+      // 咨询商品上下文：聊天页自动发送商品卡片消息（同会话同商品去重）
+      spuId: spu.value?.id ? String(spu.value.id) : '',
+      spuName: spu.value?.name || '',
     },
   })
 }

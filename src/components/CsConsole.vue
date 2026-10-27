@@ -94,6 +94,7 @@
             @click="handleToHuman"
           >转人工</van-button>
           <van-button
+            v-if="aiAvailable"
             size="mini"
             round
             plain
@@ -102,6 +103,23 @@
             @click="handleToAi"
           >转回AI</van-button>
         </span>
+      </div>
+
+      <!-- 转人工会话摘要卡片（AI 对话背景，坐席接手用） -->
+      <div v-if="activeSession.transferSummary" class="cs-transfer-summary">
+        <van-icon name="description-o" size="14" color="#1989fa" />
+        <div class="cs-summary-body">
+          <div class="cs-summary-title">AI 对话摘要</div>
+          <div class="cs-summary-text">{{ activeSession.transferSummary }}</div>
+        </div>
+      </div>
+
+      <!-- 用户正在浏览的商品（Redis 轻状态，仅商家域会话带出；点击跳自家商品管理页） -->
+      <div v-if="activeSession.viewingSpuName" class="cs-viewing-bar" @click="goGoodsManage">
+        <img v-if="activeSession.viewingSpuImage" :src="activeSession.viewingSpuImage" class="cs-viewing-img" alt="" />
+        <van-icon v-else name="photo-o" size="16" color="#c8c4c0" />
+        <span class="cs-viewing-text">用户正在浏览：<b>{{ activeSession.viewingSpuName }}</b></span>
+        <van-icon name="arrow" size="12" color="#9a9aae" />
       </div>
 
       <!-- 消息列表 -->
@@ -155,8 +173,16 @@
 
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import request from '../utils/request.js'
+
+const router = useRouter()
+
+/** 「正在浏览」横幅点击：跳商家自家商品管理页（dashboard 默认即商品管理 tab） */
+function goGoodsManage() {
+  router.push('/merchant/dashboard')
+}
 
 const props = defineProps({
   /** 坐席接口前缀：'/merchant/cs' 或 '/admin/cs' */
@@ -165,6 +191,8 @@ const props = defineProps({
   showQuota: { type: Boolean, default: false },
   /** 额度数据（父页请求后传入；未开通为 null 或额度字段为 null） */
   quota: { type: Object, default: null },
+  /** AI 功能可用（商家已开通/试用有效）：false 时隐藏「转回AI」按钮；平台端默认 true */
+  aiAvailable: { type: Boolean, default: true },
 })
 
 // ── 会话列表 ──
@@ -639,6 +667,64 @@ onUnmounted(() => {
   font-size: 11px;
   padding: 0 10px;
   height: 24px;
+}
+
+/* ── 用户正在浏览商品横幅 ── */
+.cs-viewing-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 8px 12px;
+  background: #fff8f0;
+  border: 1px solid #ffe4c7;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cs-viewing-img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+
+.cs-viewing-text {
+  flex: 1;
+  font-size: 12px;
+  color: #8a5a2a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-viewing-text b { color: #e8573a; font-weight: 600; }
+
+/* ── 转人工会话摘要卡片 ── */
+.cs-transfer-summary {  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  background: #f0f7ff;
+  border: 1px solid #d0e6ff;
+  border-radius: 8px;
+}
+
+.cs-summary-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cs-summary-title {
+  font-size: 12px;
+  color: #1989fa;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.cs-summary-text {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.6;
+  word-break: break-all;
 }
 
 /* ── 消息气泡 ── */

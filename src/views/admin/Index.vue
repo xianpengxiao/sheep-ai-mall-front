@@ -23,6 +23,7 @@
       <CategoryTab v-if="activeTab === 'category'" />
       <KnowledgeTab v-if="activeTab === 'knowledge'" />
       <CsTab v-if="activeTab === 'cs'" />
+      <LogTab v-if="activeTab === 'log'" />
     </div>
   </div>
 </template>
@@ -38,6 +39,7 @@ import FundTab from './tabs/FundTab.vue'
 import CategoryTab from './tabs/CategoryTab.vue'
 import KnowledgeTab from './tabs/KnowledgeTab.vue'
 import CsTab from './tabs/CsTab.vue'
+import LogTab from './tabs/LogTab.vue'
 
 const activeTab = ref('sys')
 
@@ -50,6 +52,7 @@ const tabs = [
   { key: 'category', label: '分类管理' },
   { key: 'knowledge', label: '知识库' },
   { key: 'cs', label: '客服坐席' },
+  { key: 'log', label: '日志管理' },
 ]
 </script>
 

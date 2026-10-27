@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { showToast } from 'vant'
 import { useUserStore } from '../stores/user.js'
 
 const routes = [
@@ -167,7 +168,7 @@ const routes = [
     path: '/chat',
     name: 'Chat',
     component: () => import('../views/chat/Index.vue'),
-    meta: { title: '智能客服' },
+    meta: { title: '智能客服', requiresAuth: true },
   },
 ]
 
@@ -179,11 +180,12 @@ const router = createRouter({
   },
 })
 
-// 路由守卫：未登录自动跳转登录页，登录后返回原页面
+// 路由守卫：未登录提示并跳转登录页，登录后返回原页面
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
 
   if (to.meta.requiresAuth && !userStore.isLogin) {
+    showToast('请先登录')
     next({ name: 'Login', query: { redirect: to.fullPath } })
   } else if (to.name === 'Login' && userStore.isLogin) {
     next('/')
